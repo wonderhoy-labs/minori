@@ -49,6 +49,8 @@ jobs:
       pages: write
       id-token: write
     uses: wonderhoy-labs/.github/.github/workflows/web.yml@main
+    with:
+      library: template
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')

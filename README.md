@@ -42,6 +42,25 @@ Keep the parts your project needs and delete the rest.
 pnpm unify
 ```
 
+## Use it in your app
+
+The template's library is `@wonderhoy-labs/template` in `packages/template/`, and the web app is built on it. A
+project replaces `greet` with the part of itself another app would want. Each release carries the library as
+`wonderhoy-labs-template-<version>.tgz`, which another project adds by its URL:
+
+```json
+"@wonderhoy-labs/template": "https://github.com/wonderhoy-labs/template/releases/download/v0.1.0/wonderhoy-labs-template-0.1.0.tgz"
+```
+
+```ts
+import { greet } from "@wonderhoy-labs/template";
+
+greet("Miku"); // "Hello, Miku!"
+```
+
+Android library modules and Rust crates work the same way. The details are in
+[the library notes](.claude/skills/wonderhoy-unification/reference/library.md).
+
 ## What has been tested
 
 The template's own CI builds and tests all three parts on every push. The web app has been opened in a browser,
@@ -86,6 +105,7 @@ The template collects nothing and talks to nothing. The apps you build from it a
 | --------------------------------------- | -------------------------------------------------- |
 | `android/`                              | The Android app                                    |
 | `web/`                                  | The web app                                        |
+| `packages/template/`                    | The library the web app is built on                |
 | `crates/template/`                      | The command-line tool                              |
 | `tools/`                                | `theme.ts` and `unify.ts`, shared by every project |
 | `.claude/skills/wonderhoy-unification/` | The guideline                                      |
