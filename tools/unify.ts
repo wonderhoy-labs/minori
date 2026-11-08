@@ -171,7 +171,8 @@ function checkVersions(brand: Brand) {
 	}
 	if (exists("android/app/build.gradle.kts")) {
 		const gradle = read("android/app/build.gradle.kts");
-		if (!gradle.includes('file("../VERSION")')) fail("android/app/build.gradle.kts has to read versionName from VERSION");
+		if (!gradle.includes('file("../VERSION")'))
+			fail("android/app/build.gradle.kts has to read versionName from VERSION");
 		if (!gradle.includes(`com.wonderhoylabs.${brand.id.replace(/-/g, "")}`)) {
 			fail(`the Android package has to be com.wonderhoylabs.${brand.id}`);
 		}
