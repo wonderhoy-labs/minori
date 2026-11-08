@@ -1,3 +1,4 @@
+import { greet } from "@wonderhoy-labs/template";
 import { brand } from "../brand";
 import { AppBar, Footer } from "./Brand";
 
@@ -6,7 +7,7 @@ export function App() {
 		<div className="app">
 			<AppBar />
 			<main className="hero">
-				<h1>{brand.name}</h1>
+				<h1>{greet(brand.name)}</h1>
 				<p>{brand.tagline}</p>
 				<mdui-card variant="filled" className="hero-card">
 					<mdui-icon-rocket-launch />

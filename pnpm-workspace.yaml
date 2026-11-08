@@ -1,5 +1,6 @@
 packages:
   - web
+  - packages/*
 
 # Install scripts are off unless a package is allowed here, as `name: true`.
 allowBuilds: {}
