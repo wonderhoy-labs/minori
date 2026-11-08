@@ -3,9 +3,16 @@
 <p align="center">The starting point for a new Wonderhoy Labs project.</p>
 
 <p align="center">
-  <a href="https://github.com/wonderhoy-labs/template/actions/workflows/ci.yml"><img src="https://github.com/wonderhoy-labs/template/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/wonderhoy-labs/template/actions/workflows/ci.yml"
+    ><img src="https://github.com/wonderhoy-labs/template/actions/workflows/ci.yml/badge.svg" alt="CI"></a
+  >
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License: Apache 2.0"></a>
-  <a href="#license-and-credits"><img src="https://img.shields.io/badge/Hatsune%20Miku-VIRTUAL%20SINGER-33CCBB" alt="Named for Hatsune Miku of VIRTUAL SINGER"></a>
+  <a href="#license-and-credits"
+    ><img
+      src="https://img.shields.io/badge/Hatsune%20Miku-VIRTUAL%20SINGER-33CCBB"
+      alt="Named for Hatsune Miku of VIRTUAL SINGER"
+    ></a
+  >
 </p>
 
 Every Wonderhoy Labs project starts here. The template has one of everything a project might have, already
