@@ -72,11 +72,8 @@ h2 {
 }
 
 .app-footer {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	gap: 8px;
 	padding: 16px var(--page-gutter) 24px;
+	text-align: center;
 	color: rgb(var(--mdui-color-on-surface-variant));
 	font-size: 12px;
 	flex: none;
@@ -86,9 +83,13 @@ h2 {
 	color: inherit;
 }
 
+/* Inline, so it stays beside the words however they wrap. */
 .app-footer-mark {
+	display: inline-block;
 	width: 10px;
 	height: 10px;
+	margin-inline-end: 8px;
+	vertical-align: -1px;
 	border-radius: 50%;
 	background: rgb(var(--wonderhoy-brand));
 	box-shadow: 0 0 0 2px rgba(var(--wonderhoy-brand), 0.3);

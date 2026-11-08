@@ -27,9 +27,8 @@ export function AppBar({ logo, children }: { logo?: string; children?: ReactNode
 export function Footer() {
 	return (
 		<footer className="app-footer">
-			<span className="app-footer-mark" aria-hidden="true" />
 			<span>
-				A{" "}
+				<span className="app-footer-mark" aria-hidden="true" />A{" "}
 				<a href="https://github.com/wonderhoy-labs" target="_blank" rel="noreferrer">
 					Wonderhoy Labs
 				</a>{" "}
