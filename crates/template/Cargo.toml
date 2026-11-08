@@ -1,0 +1,12 @@
+[package]
+name = "template"
+description = "The starting point for a new Wonderhoy Labs project."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,30 @@
+{
+	"name": "template",
+	"private": true,
+	"type": "module",
+	"license": "Apache-2.0",
+	"packageManager": "pnpm@12.15.0",
+	"engines": {
+		"node": ">=24"
+	},
+	"wonderhoy": {
+		"name": "Template",
+		"tagline": "The starting point for a new Wonderhoy Labs project.",
+		"character": "Hatsune Miku",
+		"unit": "VIRTUAL SINGER",
+		"color": "#33CCBB"
+	},
+	"scripts": {
+		"lint": "biome ci",
+		"format": "biome check --write",
+		"typecheck": "tsc -p .",
+		"theme": "node tools/theme.ts",
+		"unify": "node tools/unify.ts"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.6.2",
+		"@material/material-color-utilities": "0.3.0",
+		"@types/node": "26.6.6",
+		"typescript": "7.0.2"
+	}
+}

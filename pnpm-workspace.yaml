@@ -1,0 +1,5 @@
+packages:
+    - web
+
+# Install scripts only run for the packages listed here.
+onlyBuiltDependencies: []

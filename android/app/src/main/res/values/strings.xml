@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<string name="app_name">Template</string>
+	<string name="subtitle">A new Wonderhoy Labs project</string>
+	<string name="start_here">Replace this screen with your app. The colours, the header and the footer come from the \"wonderhoy\" block in package.json. Add the project\'s logo and launcher icon yourself; agents never make them.</string>
+</resources>
