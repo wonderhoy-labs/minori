@@ -60,6 +60,9 @@ project that needs it uses the library, never a copy: Asahi is Shinonome's and S
   `tsc -p tsconfig.build.json` adds the type declarations. Leave out `<id>.apk` and its `prepack` line if the
   package doesn't need an app. `packages/*/*.apk` is in `.gitignore`.
 - Dependencies the library imports go in its `dependencies`. The site keeps its own.
+- A dependency from git, such as a fork pinned by commit, has to be a `peerDependencies` entry instead, and pinned in the
+  library's `devDependencies` for its own build and tests. pnpm refuses to fetch a dependency's git dependencies, so a
+  project using the library adds it itself. The README says exactly what to add.
 - Tests live beside the code in `packages/<id>/src`, and CI runs them.
 - In `ci.yml`, pass `library: <id>` to `web.yml`, which tests and packs it for the release.
 
