@@ -6,8 +6,10 @@ has used one should feel at home in the next, on a phone or in a browser.
 ## Colour
 
 - The seed is the character's image colour, in `package.json` under `wonderhoy.color`.
-- `pnpm theme` runs Material's colour utilities with the **content** scheme. It keeps the image colour itself as
-  the primary container, and picks a neighbouring hue for tertiary. It writes:
+- `pnpm theme` runs Material's colour utilities with the **content** scheme. In the light theme it keeps the
+  image colour itself as the primary container, and picks a neighbouring hue for tertiary. In the dark theme the
+  primary and tertiary roles use Material's usual tones (80, 20, 30, 90) in the same hues, so a pale image colour
+  doesn't glare or swallow the buttons on it. It writes:
   - `web/src/ui/theme.css`: every mdui colour variable, light and dark, plus `--wonderhoy-brand`
   - `web/src/brand.ts`: the name, tagline, character, unit, colour and repository
   - `android/app/src/main/kotlin/com/wonderhoylabs/<id>/ui/Theme.kt`: the `Brand` object, both colour schemes and

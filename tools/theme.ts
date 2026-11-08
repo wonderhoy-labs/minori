@@ -8,7 +8,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { argbFromHex, type DynamicScheme, Hct, SchemeContent } from "@material/material-color-utilities";
+import { argbFromHex, Hct, SchemeContent } from "@material/material-color-utilities";
 
 export interface Brand {
 	/** The product name, as people read it: "Saki". */
@@ -84,10 +84,37 @@ const ROLES = [
 
 type Role = (typeof ROLES)[number];
 
-/** Material's content scheme keeps the image colour itself as the primary container. */
-export function schemes(color: string): { light: DynamicScheme; dark: DynamicScheme } {
+export type Colors = Record<Role, number>;
+
+/**
+ * In the light theme, Material's content scheme keeps the image colour itself as the primary container. In the dark
+ * theme that same pale container would glare, and a primary button on it all but disappears (Saki's yellow did both),
+ * so dark primary and tertiary roles use Material's usual tones instead: 80, 20, 30 and 90, still in the character's
+ * hue and chroma.
+ */
+export function schemes(color: string): { light: Colors; dark: Colors } {
 	const source = Hct.fromInt(argbFromHex(color));
-	return { light: new SchemeContent(source, false, 0), dark: new SchemeContent(source, true, 0) };
+	const resolve = (dark: boolean): Colors => {
+		const scheme = new SchemeContent(source, dark, 0);
+		const colors = Object.fromEntries(ROLES.map((role) => [role, scheme[role]])) as Colors;
+		if (dark) {
+			const { primaryPalette: p, tertiaryPalette: t } = scheme;
+			Object.assign(colors, {
+				primary: p.tone(80),
+				onPrimary: p.tone(20),
+				primaryContainer: p.tone(30),
+				onPrimaryContainer: p.tone(90),
+				inversePrimary: p.tone(40),
+				surfaceTint: p.tone(80),
+				tertiary: t.tone(80),
+				onTertiary: t.tone(20),
+				tertiaryContainer: t.tone(30),
+				onTertiaryContainer: t.tone(90),
+			});
+		}
+		return colors;
+	};
+	return { light: resolve(false), dark: resolve(true) };
 }
 
 const rgb = (argb: number) => [(argb >> 16) & 255, (argb >> 8) & 255, argb & 255];
@@ -140,8 +167,7 @@ export const brand = {
 export function kotlin(brand: Brand): string {
 	const { light, dark } = schemes(brand.color);
 	const pkg = `com.wonderhoylabs.${brand.id.replace(/-/g, "")}.ui`;
-	const colors = (scheme: DynamicScheme) =>
-		ROLES.map((role) => `\t${role} = Color(0xFF${hex(scheme[role])}),`).join("\n");
+	const colors = (scheme: Colors) => ROLES.map((role) => `\t${role} = Color(0xFF${hex(scheme[role])}),`).join("\n");
 	const kstring = (s: string) => JSON.stringify(s).replace(/\$/g, "\\$");
 	return `${header(brand, "// ")}
 package ${pkg}
