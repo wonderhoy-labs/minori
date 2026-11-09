@@ -49,10 +49,7 @@ class Machines(
 	fun network(id: String): GuestNetwork? = networks[id]
 
 	/** Turns a running guest's internet on or off, and remembers the choice. */
-	fun setInternet(
-		id: String,
-		on: Boolean,
-	) {
+	fun setInternet(id: String, on: Boolean) {
 		val vm = store.update(id) { it.copy(network = it.network.copy(internet = on)) }
 		networks.remove(id)?.stop()
 		val guest = guests[id]

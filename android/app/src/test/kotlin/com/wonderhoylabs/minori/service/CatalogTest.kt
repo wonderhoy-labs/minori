@@ -17,21 +17,28 @@ class CatalogTest {
 	}
 
 	@Test
-	fun everyTemplateIsOfficialOrExplainsWhyNot() {
+	fun everyTemplateIsOfficialAndChecked() {
 		for (template in Catalog.templates) {
 			val base = template.baseImage
-			if (base == null) {
-				assertNotNull("${template.id} needs a reason", template.unavailable)
-			} else {
-				assertTrue(base.url.startsWith("https://"))
-				assertTrue(base.checksums.startsWith("https://"))
-			}
+			assertTrue(base.url.startsWith("https://"))
+			assertTrue(base.checksums.startsWith("https://"))
+			assertTrue(base.url.endsWith(base.file))
 		}
 	}
 
 	@Test
-	fun windowsIsMarkedUnsupported() {
-		assertNotNull(Catalog.templates.first { it.id == "windows" }.unavailable)
+	fun onlyListsWhatRunsOnAPhone() {
+		val ids = Catalog.templates.map { it.id }
+		assertTrue(ids.none { "windows" in it || "arch" in it })
+		assertEquals(ids.size, ids.toSet().size)
+	}
+
+	@Test
+	fun desktopsSetUpTheirServersAfterTheirPackages() {
+		for (template in Catalog.templates.filter { it.vncPort != null }) {
+			assertTrue(template.packages.contains("tigervnc-standalone-server"))
+			assertTrue(template.run.any { "tigervncserver@:1" in it })
+		}
 	}
 
 	@Test

@@ -1,7 +1,7 @@
 package com.wonderhoylabs.minori.service
 
-import com.wonderhoylabs.minori.core.Native
 import com.wonderhoylabs.minori.core.MinoriJson
+import com.wonderhoylabs.minori.core.Native
 import com.wonderhoylabs.minori.model.ImageRecord
 import com.wonderhoylabs.minori.model.ImageReport
 import com.wonderhoylabs.minori.store.ImageStore
@@ -13,10 +13,29 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 
-enum class TemplateKind(val label: String) {
-	Distro("Distro"),
-	Desktop("Desktop"),
-	App("App"),
+/** Where an item sits in the store. */
+enum class StoreCategory(val label: String) {
+	Linux("Linux"),
+	Desktop("Desktops"),
+	App("Apps"),
+}
+
+/** Which Material Symbol an item shows. The store has no artwork of its own. */
+enum class StoreIcon {
+	Debian,
+	Ubuntu,
+	Fedora,
+	Desktop,
+	Browser,
+	Terminal,
+}
+
+/** A way into a machine that a template sets up, shown on its store page. */
+enum class Access(val label: String) {
+	Console("Console"),
+	Ssh("SSH"),
+	Vnc("Desktop over VNC"),
+	Rdp("Remote Desktop (RDP)"),
 }
 
 /**
@@ -27,20 +46,24 @@ enum class TemplateKind(val label: String) {
 data class Template(
 	val id: String,
 	val name: String,
-	val description: String,
-	val kind: TemplateKind,
-	val baseImage: BaseImage?,
-	val cpusAll: Boolean = true,
+	val publisher: String,
+	val summary: String,
+	val about: String,
+	val category: StoreCategory,
+	val icon: StoreIcon,
+	val baseImage: BaseImage,
+	val features: List<String>,
+	val access: List<Access>,
+	/** Roughly what first boot downloads, besides the base image. */
+	val extraDownloadMb: Int = 0,
 	val memoryMib: Int = 2048,
 	val diskGib: Int = 8,
-	val packages: List<String> = listOf("openssh-server"),
+	val packages: List<String> = emptyList(),
 	val run: List<String> = emptyList(),
 	/** The guest port of a graphical desktop it sets up, if any. */
 	val vncPort: Int? = null,
-	/** Why it can't be made, in words for the user, when it can't. */
-	val unavailable: String? = null,
-	/** What hasn't been seen to work yet, shown on the card. */
-	val caveat: String? = null,
+	/** How long first boot takes on a phone, in words. */
+	val firstBoot: String = "about two minutes",
 )
 
 /** An official image and the checksum list that vouches for it. */
@@ -51,6 +74,7 @@ data class BaseImage(
 	val algorithm: String,
 	val file: String,
 	val project: String,
+	val sizeMb: Int,
 )
 
 object Catalog {
@@ -64,6 +88,7 @@ object Catalog {
 			algorithm = "SHA-512",
 			file = "debian-13-genericcloud-arm64.qcow2",
 			project = "Debian",
+			sizeMb = 330,
 		)
 
 	private val ubuntu2404 =
@@ -74,6 +99,7 @@ object Catalog {
 			algorithm = "SHA-256",
 			file = "ubuntu-24.04-server-cloudimg-arm64.img",
 			project = "Ubuntu",
+			sizeMb = 600,
 		)
 
 	private val fedora43 =
@@ -84,94 +110,128 @@ object Catalog {
 			algorithm = "SHA-256",
 			file = "Fedora-Cloud-Base-Generic-43-1.6.aarch64.qcow2",
 			project = "Fedora",
+			sizeMb = 550,
 		)
 
-	private const val VNC_SETUP =
-		"mkdir -p /home/{user}/.config/tigervnc && " +
-			"printf '%s\\n' '{vncpassword}' | vncpasswd -f > /home/{user}/.config/tigervnc/passwd && " +
-			"chmod 600 /home/{user}/.config/tigervnc/passwd && chown -R {user}:{user} /home/{user}/.config && " +
-			"echo ':1={user}' >> /etc/tigervnc/vncserver.users && " +
-			"printf 'session={session}\\nlocalhost\\ngeometry=1600x900\\n' > /home/{user}/.config/tigervnc/config && " +
-			"chown {user}:{user} /home/{user}/.config/tigervnc/config && systemctl enable --now tigervncserver@:1"
+	/** First boot of a desktop: a VNC server on display :1 and an RDP server, both logging in as the user. */
+	private fun desktopRun(session: String): List<String> = listOf(
+		"mkdir -p /home/{user}/.config/tigervnc",
+		"printf '%s\\n' '{vncpassword}' | vncpasswd -f > /home/{user}/.config/tigervnc/passwd",
+		"chmod 600 /home/{user}/.config/tigervnc/passwd",
+		"printf 'session=$session\\nlocalhost\\ngeometry=1600x900\\n' > /home/{user}/.config/tigervnc/config",
+		"echo ':1={user}' >> /etc/tigervnc/vncserver.users",
+		"echo '$session' > /home/{user}/.xsession",
+		"chown -R {user}:{user} /home/{user}/.config /home/{user}/.xsession",
+		"systemctl enable --now tigervncserver@:1",
+		"systemctl enable --now xrdp",
+	)
 
 	val templates: List<Template> =
 		listOf(
 			Template(
 				id = "debian-13",
 				name = "Debian 13",
-				description =
-					"Debian's official 64-bit Arm cloud image, with a user, SSH and Minori's guest agent set up on first boot.",
-				kind = TemplateKind.Distro,
+				publisher = "The Debian Project",
+				summary = "The universal operating system, ready to use in two minutes.",
+				about =
+					"Debian's official 64-bit Arm cloud image, checked against Debian's own checksums. On first boot " +
+						"Minori sets up your user, an SSH key, internet for the guest and its guest agent.",
+				category = StoreCategory.Linux,
+				icon = StoreIcon.Debian,
 				baseImage = debian13,
+				features = listOf("Debian 13 \"trixie\"", "OpenSSH server", "apt and the full Debian archive"),
+				access = listOf(Access.Console, Access.Ssh),
 			),
 			Template(
 				id = "ubuntu-24.04",
 				name = "Ubuntu 24.04 LTS",
-				description = "Ubuntu's official 64-bit Arm server cloud image.",
-				kind = TemplateKind.Distro,
+				publisher = "Canonical",
+				summary = "Long-term support server, with five years of updates.",
+				about = "Ubuntu's official 64-bit Arm server cloud image, checked against Ubuntu's own checksums.",
+				category = StoreCategory.Linux,
+				icon = StoreIcon.Ubuntu,
 				baseImage = ubuntu2404,
-				caveat = "Not booted under AVF yet.",
+				features = listOf("Ubuntu Server 24.04 LTS", "OpenSSH server", "snap and apt"),
+				access = listOf(Access.Console, Access.Ssh),
 			),
 			Template(
 				id = "fedora-43",
 				name = "Fedora 43",
-				description =
-					"Fedora's official 64-bit Arm cloud image. Its root is Btrfs, so Minori boots it from the separate /boot.",
-				kind = TemplateKind.Distro,
+				publisher = "The Fedora Project",
+				summary = "The newest Linux, from the people who make it.",
+				about =
+					"Fedora's official 64-bit Arm cloud image. Its root filesystem is Btrfs, so Minori boots it from " +
+						"its separate /boot.",
+				category = StoreCategory.Linux,
+				icon = StoreIcon.Fedora,
 				baseImage = fedora43,
-				caveat = "Not booted under AVF yet.",
-			),
-			Template(
-				id = "arch",
-				name = "Arch Linux",
-				description = "Arch Linux ARM.",
-				kind = TemplateKind.Distro,
-				baseImage = null,
-				unavailable =
-					"Arch Linux ARM publishes a root filesystem archive, not a disk image, and Minori can't build a disk " +
-						"from one yet. On the Termux backend, proot-distro can install Arch.",
+				features = listOf("Fedora Cloud 43", "OpenSSH server", "dnf"),
+				access = listOf(Access.Console, Access.Ssh),
 			),
 			Template(
 				id = "kde-desktop",
-				name = "KDE Plasma desktop",
-				description = "Debian 13 with KDE Plasma 6, shown through VNC. First boot downloads about 1.5 GB of packages.",
-				kind = TemplateKind.Desktop,
+				name = "KDE Plasma",
+				publisher = "Debian 13 with KDE",
+				summary = "A full desktop computer on your phone.",
+				about =
+					"Debian 13 with the KDE Plasma desktop, installed on first boot. Open it in Minori over VNC, or from " +
+						"any Remote Desktop app. First boot downloads about 1.5 GB and takes a while; the machine's page " +
+						"shows when the desktop is ready.",
+				category = StoreCategory.Desktop,
+				icon = StoreIcon.Desktop,
 				baseImage = debian13,
+				features = listOf("KDE Plasma 6", "Firefox ESR", "TigerVNC and xrdp"),
+				access = listOf(Access.Vnc, Access.Rdp, Access.Ssh),
+				extraDownloadMb = 1500,
 				memoryMib = 4096,
 				diskGib = 16,
-				packages = listOf("openssh-server", "kde-plasma-desktop", "tigervnc-standalone-server", "dbus-x11"),
-				run = listOf(VNC_SETUP.replace("{session}", "plasmax11")),
+				packages =
+					listOf(
+						"kde-plasma-desktop",
+						"firefox-esr",
+						"tigervnc-standalone-server",
+						"xrdp",
+						"dbus-x11",
+					),
+				run = desktopRun("startplasma-x11"),
 				vncPort = 5901,
-				caveat = "Not run on a phone yet.",
+				firstBoot = "ten to twenty minutes",
 			),
 			Template(
 				id = "chromium",
-				name = "Chromium browser",
-				description = "Debian 13 with only Chromium in a small window manager, shown through VNC.",
-				kind = TemplateKind.App,
+				name = "Chromium",
+				publisher = "Debian 13 with Chromium",
+				summary = "A desktop browser in a window of its own.",
+				about =
+					"Chromium in a small Openbox desktop on Debian 13, installed on first boot. Open it in Minori over VNC, " +
+						"or from any Remote Desktop app.",
+				category = StoreCategory.App,
+				icon = StoreIcon.Browser,
 				baseImage = debian13,
+				features = listOf("Chromium", "Openbox", "TigerVNC and xrdp"),
+				access = listOf(Access.Vnc, Access.Rdp, Access.Ssh),
+				extraDownloadMb = 400,
 				memoryMib = 3072,
 				diskGib = 10,
-				packages = listOf("openssh-server", "chromium", "openbox", "tigervnc-standalone-server", "dbus-x11"),
+				packages =
+					listOf(
+						"chromium",
+						"openbox",
+						"tigervnc-standalone-server",
+						"xrdp",
+						"dbus-x11",
+					),
 				run =
 					listOf(
-						"mkdir -p /home/{user}/.config/openbox && echo 'chromium --start-maximized &' > /home/{user}/.config/openbox/autostart && chown -R {user}:{user} /home/{user}/.config",
-						VNC_SETUP.replace("{session}", "openbox"),
-					),
+						"mkdir -p /home/{user}/.config/openbox",
+						"echo 'chromium --start-maximized &' > /home/{user}/.config/openbox/autostart",
+					) + desktopRun("openbox-session"),
 				vncPort = 5901,
-				caveat = "Not run on a phone yet.",
-			),
-			Template(
-				id = "windows",
-				name = "Windows 11 on Arm",
-				description = "Microsoft Windows.",
-				kind = TemplateKind.Desktop,
-				baseImage = null,
-				unavailable =
-					"AVF starts a Linux kernel directly and has no UEFI firmware, TPM or display Windows could boot " +
-						"with, and Microsoft offers no image Minori may download for you. Minori doesn't offer it.",
+				firstBoot = "about five minutes",
 			),
 		)
+
+	fun template(id: String?): Template? = templates.firstOrNull { it.id == id }
 
 	/**
 	 * Downloads a base image into the library, resuming a partial download, and checks it against the project's

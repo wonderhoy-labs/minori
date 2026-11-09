@@ -31,7 +31,7 @@ import com.wonderhoylabs.minori.setup.ShizukuState
 import com.wonderhoylabs.minori.ui.AppModel
 import com.wonderhoylabs.minori.ui.CommandBox
 import com.wonderhoylabs.minori.ui.Fact
-import com.wonderhoylabs.minori.ui.Section
+import com.wonderhoylabs.minori.ui.Panel
 import com.wonderhoylabs.minori.ui.SubScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -74,7 +74,7 @@ fun SetupScreen(model: AppModel) {
 	}
 
 	SubScreen(title = "Set up Minori", model = model) {
-		Section(title = "This phone", highlight = state.canRunVms) {
+		Panel(title = "This phone") {
 			Fact("Android", "${Build.VERSION.RELEASE} (API ${state.sdk}), ${state.buildType} build")
 			Fact("Virtualization Framework", if (state.avfFeature) "Present" else "Not on this device")
 			Fact("Minori can boot your own kernels", if (state.hiddenApi) "Yes" else "No")
@@ -83,7 +83,7 @@ fun SetupScreen(model: AppModel) {
 			}
 		}
 		if (!state.avfFeature) {
-			Section(title = "No hypervisor here") {
+			Panel(title = "No hypervisor here") {
 				Text(
 					"This device doesn't have Android's Virtualization Framework, so Minori can't run virtual machines on it. " +
 						"Pixel 6 and newer phones on Android 14 or later have it; emulators and most other phones don't.",
@@ -97,7 +97,7 @@ fun SetupScreen(model: AppModel) {
 				}
 			}
 		}
-		Section(title = "Permissions") {
+		Panel(title = "Permissions") {
 			for (permission in Privileges.PERMISSIONS) {
 				Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
 					val granted = permission !in state.missing
@@ -117,7 +117,7 @@ fun SetupScreen(model: AppModel) {
 			)
 		}
 		if (!state.granted) {
-			Section(title = "With Shizuku") {
+			Panel(title = "With Shizuku") {
 				when (state.shizuku) {
 					ShizukuState.NotInstalled -> {
 						Text("Shizuku isn't installed. It lets apps run the few commands that need adb, without a computer each time.")
@@ -150,7 +150,7 @@ fun SetupScreen(model: AppModel) {
 				}
 				result?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 			}
-			Section(title = "With a computer") {
+			Panel(title = "With a computer") {
 				Text("Turn on USB debugging, connect the phone, and run these on the computer:")
 				for (command in Privileges.adbCommands(context.packageName)) CommandBox(command)
 				Text(
@@ -162,7 +162,7 @@ fun SetupScreen(model: AppModel) {
 			}
 		}
 		if (state.granted && state.avfFeature && !state.hiddenApi) {
-			Section(title = "Blocked by Android") {
+			Panel(title = "Blocked by Android") {
 				Text(
 					"The permissions are granted, but this Android version blocks the calls Minori uses to boot a custom " +
 						"kernel. Minori can't run VMs here until it supports this version.",
@@ -170,7 +170,7 @@ fun SetupScreen(model: AppModel) {
 			}
 		}
 		if (state.granted && !state.avfFeature) {
-			Section(title = "Granted, but no hypervisor") {
+			Panel(title = "Granted, but no hypervisor") {
 				Text(
 					"Android accepted the permissions, but there's still no Virtualization Framework on this device, so " +
 						"they don't do anything here.",

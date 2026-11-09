@@ -4,9 +4,9 @@ import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Base64
+import com.wonderhoylabs.minori.core.MinoriJson
 import com.wonderhoylabs.minori.core.Native
 import com.wonderhoylabs.minori.core.NativeProgress
-import com.wonderhoylabs.minori.core.MinoriJson
 import com.wonderhoylabs.minori.model.AccessSettings
 import com.wonderhoylabs.minori.model.BackendKind
 import com.wonderhoylabs.minori.model.BootSettings
@@ -65,7 +65,8 @@ data class FirstBoot(
 	val user: String,
 	val password: String?,
 	val generateKey: Boolean = true,
-	val packages: List<String> = listOf("openssh-server"),
+	/** Packages to install once the guest has internet, which comes through its agent. */
+	val packages: List<String> = emptyList(),
 	val installAgent: Boolean = true,
 	val extraRun: List<String> = emptyList(),
 )
@@ -252,13 +253,20 @@ class Operations(private val context: Context, private val vms: VmStore, private
 				put("permissions", "0644")
 				put("content", context.assets.open(CONSOLE_SIZE_ASSET).use { it.readBytes().toString(Charsets.UTF_8) })
 			}
+		if (firstBoot.packages.isNotEmpty()) {
+			// cloud-init's own package step runs before the agent, and so before the guest has internet. Install here
+			// instead, once the agent has started and DNS answers.
+			run += "for i in \$(seq 1 120); do getent hosts deb.debian.org >/dev/null && break; sleep 5; done"
+			run += "apt-get update"
+			run += "DEBIAN_FRONTEND=noninteractive apt-get install -y ${firstBoot.packages.joinToString(" ")}"
+		}
 		run += firstBoot.extraRun
+		run += "touch /var/lib/minori-ready"
 		return buildJsonObject {
 			put("hostname", firstBoot.hostname)
 			put("user", firstBoot.user)
 			firstBoot.password?.let { put("password", it) }
 			put("ssh_keys", buildJsonArray { publicKey?.let { add(kotlinx.serialization.json.JsonPrimitive(it)) } })
-			put("packages", buildJsonArray { firstBoot.packages.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) } })
 			put("files", buildJsonArray { files.forEach { add(it) } })
 			put("run", buildJsonArray { run.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) } })
 		}.toString()
@@ -416,7 +424,8 @@ class Operations(private val context: Context, private val vms: VmStore, private
 		const val AGENT_ASSET = "minori-agent-aarch64"
 		const val CONSOLE_SIZE_ASSET = "minori-console-size.sh"
 		const val AGENT_UNIT =
-			"[Unit]\nDescription=Minori guest agent\nAfter=network.target\n\n[Service]\nExecStart=/usr/local/bin/minori-agent\n" +
+			"[Unit]\nDescription=Minori guest agent\nAfter=network.target\n\n" +
+				"[Service]\nExecStart=/usr/local/bin/minori-agent\n" +
 				"Restart=always\nRestartSec=2\n\n[Install]\nWantedBy=multi-user.target\n"
 
 		fun safeName(name: String): String = name.replace(Regex("[^A-Za-z0-9._-]"), "_").take(100).ifEmpty { "image" }

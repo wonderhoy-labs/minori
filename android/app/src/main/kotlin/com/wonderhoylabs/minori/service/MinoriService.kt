@@ -10,8 +10,8 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import com.wonderhoylabs.minori.R
 import com.wonderhoylabs.minori.MinoriApp
+import com.wonderhoylabs.minori.R
 import com.wonderhoylabs.minori.ui.MainActivity
 
 /**

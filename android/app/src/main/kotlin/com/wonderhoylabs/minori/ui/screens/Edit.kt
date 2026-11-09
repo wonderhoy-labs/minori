@@ -35,7 +35,7 @@ import com.wonderhoylabs.minori.model.VmState
 import com.wonderhoylabs.minori.service.Operations
 import com.wonderhoylabs.minori.store.usage
 import com.wonderhoylabs.minori.ui.AppModel
-import com.wonderhoylabs.minori.ui.Section
+import com.wonderhoylabs.minori.ui.Panel
 import com.wonderhoylabs.minori.ui.SubScreen
 
 /** Changes a stopped machine: name, CPUs, memory, disks, how it boots, and notes. */
@@ -70,7 +70,7 @@ fun EditScreen(model: AppModel, vmId: String) {
 				color = MaterialTheme.colorScheme.error,
 			)
 		}
-		Section(title = "Machine") {
+		Panel(title = "Machine") {
 			OutlinedTextField(value = name, onValueChange = {
 				name = it
 			}, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -105,7 +105,7 @@ fun EditScreen(model: AppModel, vmId: String) {
 				Switch(checked = autoStart, onCheckedChange = { autoStart = it })
 			}
 		}
-		Section(title = "Disks") {
+		Panel(title = "Disks") {
 			for (disk in vm.disks) {
 				val usage = app.vms.diskFile(vm, disk.file).usage()
 				Column {
@@ -133,7 +133,7 @@ fun EditScreen(model: AppModel, vmId: String) {
 			}
 		}
 		if (vm.boot != null) {
-			Section(title = "Boot") {
+			Panel(title = "Boot") {
 				OutlinedTextField(value = cmdline, onValueChange = {
 					cmdline = it
 				}, label = { Text("Kernel command line") }, modifier = Modifier.fillMaxWidth())
@@ -149,7 +149,7 @@ fun EditScreen(model: AppModel, vmId: String) {
 				)
 			}
 		}
-		Section(title = "Logging in") {
+		Panel(title = "Logging in") {
 			OutlinedTextField(value = user, onValueChange = {
 				user = it
 			}, label = { Text("User") }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -168,7 +168,7 @@ fun EditScreen(model: AppModel, vmId: String) {
 				vncPassword = it
 			}, label = { Text("VNC password") }, singleLine = true, modifier = Modifier.fillMaxWidth())
 		}
-		Section(title = "Notes") {
+		Panel(title = "Notes") {
 			OutlinedTextField(value = notes, onValueChange = { notes = it }, modifier = Modifier.fillMaxWidth(), minLines = 3)
 		}
 		Button(onClick = {

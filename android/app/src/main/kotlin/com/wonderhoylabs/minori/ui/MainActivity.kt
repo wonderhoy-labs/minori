@@ -1,0 +1,270 @@
+package com.wonderhoylabs.minori.ui
+
+import android.content.Intent
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.Dns
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Storefront
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import com.wonderhoylabs.minori.BuildConfig
+import com.wonderhoylabs.minori.MinoriApp
+import com.wonderhoylabs.minori.backend.DemoTarget
+import com.wonderhoylabs.minori.service.Job
+import com.wonderhoylabs.minori.setup.Privileges
+import com.wonderhoylabs.minori.ui.screens.ConsoleScreen
+import com.wonderhoylabs.minori.ui.screens.CreateScreen
+import com.wonderhoylabs.minori.ui.screens.DetailScreen
+import com.wonderhoylabs.minori.ui.screens.EditScreen
+import com.wonderhoylabs.minori.ui.screens.ImagesTab
+import com.wonderhoylabs.minori.ui.screens.MachinesTab
+import com.wonderhoylabs.minori.ui.screens.SettingsTab
+import com.wonderhoylabs.minori.ui.screens.SetupScreen
+import com.wonderhoylabs.minori.ui.screens.SshScreen
+import com.wonderhoylabs.minori.ui.screens.StoreItemScreen
+import com.wonderhoylabs.minori.ui.screens.StoreTab
+import com.wonderhoylabs.minori.ui.screens.VncScreen
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+enum class Tab(val label: String, val icon: ImageVector) {
+	Machines("Machines", Icons.Rounded.Dns),
+	Store("Store", Icons.Rounded.Storefront),
+	Images("Images", Icons.Rounded.Album),
+	Settings("Settings", Icons.Rounded.Settings),
+}
+
+/** Where the user is. The app keeps a simple back stack of these, with the tabs at the bottom of it. */
+sealed interface Screen {
+	data class Tabs(val tab: Tab) : Screen
+
+	data object Setup : Screen
+
+	data class StoreItem(val templateId: String) : Screen
+
+	/** The settings for a new machine, from a store item, an image, or a Termux userland. */
+	data class Create(val templateId: String? = null, val imageId: String? = null, val termux: Boolean = false) : Screen
+
+	data class Detail(val vmId: String) : Screen
+
+	data class Edit(val vmId: String) : Screen
+
+	data class Console(val vmId: String) : Screen
+
+	data class Ssh(val vmId: String) : Screen
+
+	data class Vnc(val vmId: String, val guestPort: Int) : Screen
+}
+
+/** The back stack, and the one long job (copying, downloading, exporting) that may be running. */
+class AppModel : ViewModel() {
+	val stack = mutableStateListOf<Screen>(Screen.Tabs(Tab.Machines))
+	val job = mutableStateOf<Job?>(null)
+	val message = mutableStateOf<String?>(null)
+	private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+	val current: Screen get() = stack.last()
+
+	fun go(screen: Screen) {
+		stack.add(screen)
+	}
+
+	fun replace(screen: Screen) {
+		if (stack.size > 1) stack.removeAt(stack.lastIndex)
+		stack.add(screen)
+	}
+
+	/** Goes to a tab, closing whatever was open over the tabs. */
+	fun tab(tab: Tab) {
+		stack.clear()
+		stack.add(Screen.Tabs(tab))
+	}
+
+	fun back(): Boolean {
+		if (stack.size <= 1) {
+			val root = stack.firstOrNull()
+			if (root is Screen.Tabs && root.tab != Tab.Machines) {
+				tab(Tab.Machines)
+				return true
+			}
+			return false
+		}
+		stack.removeAt(stack.lastIndex)
+		return true
+	}
+
+	/** Runs [work] off the main thread with a progress dialog, then [then] on the main thread with its result. */
+	fun <T> run(title: String, work: (Job) -> T, then: (T) -> Unit = {}) {
+		val running = Job(title)
+		job.value = running
+		scope.launch {
+			val result = withContext(Dispatchers.IO) { runCatching { work(running) } }
+			job.value = null
+			result.onSuccess(then).onFailure { message.value = it.message ?: it.javaClass.simpleName }
+		}
+	}
+}
+
+class MainActivity : ComponentActivity() {
+	private val model by lazy { ViewModelProvider(this)[AppModel::class.java] }
+
+	override fun onCreate(savedInstanceState: Bundle?) {
+		enableEdgeToEdge()
+		super.onCreate(savedInstanceState)
+		val app = MinoriApp.get(this)
+		val privileges = Privileges.state(this)
+		if (savedInstanceState == null && privileges.avfFeature && !privileges.granted && app.vms.vms.value.isEmpty()) {
+			model.go(Screen.Setup)
+		}
+		if (intent?.getBooleanExtra(Privileges.AFTER_GRANT, false) == true && model.current != Screen.Setup) {
+			model.go(Screen.Setup)
+		}
+		handleLink(intent)
+		handleDevExtras(intent)
+		setContent {
+			MinoriTheme {
+				Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+					App(model)
+				}
+			}
+		}
+	}
+
+	override fun onNewIntent(intent: Intent) {
+		super.onNewIntent(intent)
+		if (intent.getBooleanExtra(Privileges.AFTER_GRANT, false) && model.current != Screen.Setup) model.go(Screen.Setup)
+		handleLink(intent)
+		handleDevExtras(intent)
+	}
+
+	/**
+	 * Opens `minori://vm/<id or name>`, and `/console`, `/ssh` or `/vnc` after it, for other apps and for Asahi
+	 * through `am start`. The machine has to be running for the last three; nothing is started for the caller.
+	 */
+	private fun handleLink(intent: Intent?) {
+		val uri = intent?.data ?: return
+		if (uri.scheme != "minori" || uri.host != "vm") return
+		val key = uri.pathSegments.getOrNull(0) ?: return
+		val app = MinoriApp.get(this)
+		val vm = app.vms.get(key) ?: app.vms.vms.value.firstOrNull { it.name == key } ?: return
+		model.go(Screen.Detail(vm.id))
+		when (uri.pathSegments.getOrNull(1)) {
+			"console" -> model.go(Screen.Console(vm.id))
+			"ssh" -> model.go(Screen.Ssh(vm.id))
+			"vnc" -> model.go(Screen.Vnc(vm.id, vm.access.vncPort))
+		}
+	}
+
+	/**
+	 * Debug builds take extras so tests can drive real flows on the emulator, which can't run AVF:
+	 * `--es dev_guest_console host:port` and `--es dev_guest_agent host:port` point the demo backend at a serial
+	 * console and a minori-agent over TCP, `--es dev_open <vm id>` opens a machine's page, and
+	 * `--es dev_screen setup|store|images|settings` opens a screen.
+	 */
+	private fun handleDevExtras(intent: Intent?) {
+		if (!BuildConfig.DEBUG || intent == null) return
+		val app = MinoriApp.get(this)
+		val console = intent.getStringExtra("dev_guest_console")
+		val agent = intent.getStringExtra("dev_guest_agent")
+		if (console != null || agent != null) app.demoTarget = DemoTarget(console = console, agent = agent)
+		intent.getStringExtra("dev_open")?.let { id -> if (app.vms.get(id) != null) model.go(Screen.Detail(id)) }
+		when (intent.getStringExtra("dev_screen")) {
+			"setup" -> model.go(Screen.Setup)
+			"store", "create" -> model.tab(Tab.Store)
+			"images" -> model.tab(Tab.Images)
+			"settings" -> model.tab(Tab.Settings)
+		}
+	}
+}
+
+@Composable
+fun App(model: AppModel) {
+	BackHandler(enabled = model.stack.size > 1 || (model.stack.first() as? Screen.Tabs)?.tab != Tab.Machines) {
+		model.back()
+	}
+	AnimatedContent(
+		targetState = model.stack.toList(),
+		transitionSpec = {
+			val forward = targetState.size >= initialState.size
+			if (targetState.size == initialState.size && targetState.last() is Screen.Tabs) {
+				fadeIn() togetherWith fadeOut()
+			} else {
+				(slideInHorizontally { width -> if (forward) width / 4 else -width / 4 } + fadeIn()) togetherWith
+					(slideOutHorizontally { width -> if (forward) -width / 4 else width / 4 } + fadeOut())
+			}
+		},
+		label = "screens",
+	) { stack ->
+		when (val screen = stack.last()) {
+			is Screen.Tabs -> Tabs(model, screen.tab)
+			Screen.Setup -> SetupScreen(model)
+			is Screen.StoreItem -> StoreItemScreen(model, screen.templateId)
+			is Screen.Create -> CreateScreen(model, screen)
+			is Screen.Detail -> DetailScreen(model, screen.vmId)
+			is Screen.Edit -> EditScreen(model, screen.vmId)
+			is Screen.Console -> ConsoleScreen(model, screen.vmId)
+			is Screen.Ssh -> SshScreen(model, screen.vmId)
+			is Screen.Vnc -> VncScreen(model, screen.vmId, screen.guestPort)
+		}
+	}
+	JobDialog(model)
+	MessageDialog(model)
+}
+
+@Composable
+private fun Tabs(model: AppModel, tab: Tab) {
+	Scaffold(
+		bottomBar = {
+			NavigationBar {
+				for (entry in Tab.entries) {
+					NavigationBarItem(
+						selected = entry == tab,
+						onClick = { model.tab(entry) },
+						icon = { Icon(entry.icon, contentDescription = null) },
+						label = { Text(entry.label) },
+					)
+				}
+			}
+		},
+		containerColor = MaterialTheme.colorScheme.background,
+	) { padding ->
+		Box(Modifier.fillMaxSize().padding(padding)) {
+			when (tab) {
+				Tab.Machines -> MachinesTab(model)
+				Tab.Store -> StoreTab(model)
+				Tab.Images -> ImagesTab(model)
+				Tab.Settings -> SettingsTab(model)
+			}
+		}
+	}
+}

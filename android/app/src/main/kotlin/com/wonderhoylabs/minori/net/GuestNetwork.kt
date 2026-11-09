@@ -23,10 +23,7 @@ enum class NetworkState {
  * here, and saki-core's NAT turns them into the app's own sockets. It keeps trying while the VM runs, so it
  * connects once the agent is up and reconnects if the agent restarts.
  */
-class GuestNetwork(
-	private val name: String,
-	private val guest: AgentGuest,
-) {
+class GuestNetwork(private val name: String, private val guest: AgentGuest) {
 	private val stateFlow = MutableStateFlow(NetworkState.Waiting)
 	val state: StateFlow<NetworkState> = stateFlow.asStateFlow()
 

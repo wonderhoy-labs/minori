@@ -57,7 +57,7 @@ class DemoHypervisor(private val target: () -> DemoTarget) : Hypervisor {
 				return Agent.connect(tcp(agent), guestPort)
 			}
 
-			override fun listeningPorts(): List<Int>? = target.agent?.let { Agent.ports(tcp(it)) }
+			override fun listeningPorts(): List<Int>? = target.agent?.let { runCatching { Agent.ports(tcp(it)) }.getOrNull() }
 
 			override fun requestShutdown(): Boolean {
 				forceStop()
@@ -74,7 +74,7 @@ class DemoHypervisor(private val target: () -> DemoTarget) : Hypervisor {
 	private fun shellConsole(vm: VmConfig, dir: File, events: GuestEvents): ConsoleChannel {
 		val home = File(dir, "home").apply { mkdirs() }
 		val prompt = vm.name.lowercase().replace(Regex("[^a-z0-9-]"), "-")
-		val rc = File(home, ".ruirc").apply { writeText("PS1='$prompt\$ '\n") }
+		val rc = File(home, ".minorirc").apply { writeText("PS1='$prompt\$ '\n") }
 		val environment =
 			arrayOf(
 				"HOME=${home.path}",

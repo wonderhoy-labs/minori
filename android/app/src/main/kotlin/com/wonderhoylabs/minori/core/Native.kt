@@ -66,17 +66,10 @@ object Native {
 	@Throws(IOException::class)
 	external fun natStart(): Long
 
-	external fun natInput(
-		handle: Long,
-		packet: ByteArray,
-		length: Int,
-	)
+	external fun natInput(handle: Long, packet: ByteArray, length: Int)
 
 	/** Blocks until there's a packet for the guest; returns its length, or -1 once stopped. */
-	external fun natOutput(
-		handle: Long,
-		buffer: ByteArray,
-	): Int
+	external fun natOutput(handle: Long, buffer: ByteArray): Int
 
 	external fun natStop(handle: Long)
 

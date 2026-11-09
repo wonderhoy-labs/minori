@@ -93,7 +93,7 @@ class AvfHypervisor(private val context: Context) : Hypervisor {
 							},
 						)
 					}
-				}// The guest's internet comes from Minori's own NAT through the agent (net/GuestNetwork.kt), which works
+				} // The guest's internet comes from Minori's own NAT through the agent (net/GuestNetwork.kt), which works
 				// whether or not this Android build lets apps use AVF's network.
 				.useNetwork(false)
 				.build()
