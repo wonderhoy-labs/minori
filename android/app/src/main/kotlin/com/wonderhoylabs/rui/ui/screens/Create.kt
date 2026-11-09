@@ -228,7 +228,7 @@ private fun SettingsForm(
 	val cloudImage = template != null || (image?.report?.format != "iso" && image?.report?.bootable == true)
 	var firstBoot by rememberSaveable { mutableStateOf(cloudImage) }
 
-	SubScreen(title = template?.name ?: image?.name ?: "Termux userland", model = model) {
+	SubScreen(title = template?.let { "New ${it.name} machine" } ?: if (source == Source.Termux) "New Termux userland" else "New machine", model = model) {
 		image?.let { ImageCard(it, onClick = null) }
 		template?.let { Text(it.description) }
 		Section(title = "Machine") {

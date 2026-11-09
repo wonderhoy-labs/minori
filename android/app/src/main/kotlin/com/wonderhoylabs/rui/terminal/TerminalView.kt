@@ -3,6 +3,7 @@ package com.wonderhoylabs.rui.terminal
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -124,7 +125,6 @@ fun TerminalView(
 	val keyboard = LocalSoftwareKeyboardController.current
 	var ctrl by remember { mutableStateOf(false) }
 	var alt by remember { mutableStateOf(false) }
-	var field by remember { mutableStateOf(TextFieldValue(SENTINEL, TextRange(SENTINEL.length))) }
 	var scrollOffset by remember { mutableIntStateOf(0) }
 
 	fun send(text: String) {
@@ -169,7 +169,17 @@ fun TerminalView(
 							focus.requestFocus()
 							keyboard?.show()
 						})
-					}.semantics { contentDescription = "Terminal" },
+					}.semantics { contentDescription = "Terminal" }
+					.onPreviewKeyEvent { event ->
+						if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+						val bytes = terminalBytes(event.nativeKeyEvent, session.emulator.applicationCursorKeys) ?: return@onPreviewKeyEvent false
+						send(bytes)
+						true
+					}.terminalInput(
+						onText = { send(it) },
+						onKey = { event -> terminalBytes(event, session.emulator.applicationCursorKeys)?.let { send(it) } != null },
+					).focusRequester(focus)
+					.focusable(),
 		) {
 			Canvas(modifier = Modifier.fillMaxSize()) {
 				@Suppress("UNUSED_EXPRESSION")
@@ -225,56 +235,6 @@ fun TerminalView(
 					}
 				}
 			}
-			BasicTextField(
-				value = field,
-				onValueChange = { next ->
-					val old = field.text
-					val new = next.text
-					when {
-						new.length > old.length && new.startsWith(old) -> send(new.substring(old.length).replace('\n', '\r'))
-						new.length < old.length -> repeat(old.length - new.length) { send("\u007f") }
-						new != old -> send(new.removePrefix(SENTINEL))
-					}
-					field = TextFieldValue(SENTINEL, TextRange(SENTINEL.length))
-				},
-				keyboardOptions =
-					KeyboardOptions(
-						autoCorrectEnabled = false,
-						keyboardType = KeyboardType.Password,
-						imeAction = ImeAction.None,
-					),
-				modifier =
-					Modifier
-						.size(1.dp)
-						.focusRequester(focus)
-						.onPreviewKeyEvent { event ->
-							if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-							when (event.key) {
-								Key.Enter, Key.NumPadEnter -> send("\r")
-								Key.Backspace -> send("\u007f")
-								Key.Tab -> send("\t")
-								Key.Escape -> send("\u001b")
-								Key.DirectionUp -> cursorKey('A')
-								Key.DirectionDown -> cursorKey('B')
-								Key.DirectionRight -> cursorKey('C')
-								Key.DirectionLeft -> cursorKey('D')
-								Key.MoveHome -> send("\u001b[H")
-								Key.MoveEnd -> send("\u001b[F")
-								Key.PageUp -> send("\u001b[5~")
-								Key.PageDown -> send("\u001b[6~")
-								Key.Delete -> send("\u001b[3~")
-								else -> {
-									if (event.isCtrlPressed && event.utf16CodePoint in 'a'.code..'z'.code) {
-										ctrl = true
-										send(event.utf16CodePoint.toChar().toString())
-									} else {
-										return@onPreviewKeyEvent false
-									}
-								}
-							}
-							true
-						},
-			)
 		}
 		if (session.canType) {
 			Row(
@@ -304,8 +264,6 @@ fun TerminalView(
 		focus.requestFocus()
 	}
 }
-
-private const val SENTINEL = "  "
 
 @Composable
 fun TerminalEnded(

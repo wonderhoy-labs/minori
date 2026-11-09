@@ -49,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wonderhoylabs.rui.model.BackendKind
 import com.wonderhoylabs.rui.model.VmState
@@ -66,7 +67,7 @@ fun SubScreen(
 ) {
 	Column(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
 		TopAppBar(
-			title = { Text(title) },
+			title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
 			navigationIcon = {
 				IconButton(onClick = { model.back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
 			},

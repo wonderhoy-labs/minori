@@ -83,18 +83,19 @@ class DemoHypervisor(
 		events: GuestEvents,
 	): ConsoleChannel {
 		val home = File(dir, "home").apply { mkdirs() }
+		val prompt = vm.name.lowercase().replace(Regex("[^a-z0-9-]"), "-")
+		val rc = File(home, ".ruirc").apply { writeText("PS1='$prompt\$ '\n") }
 		val environment =
 			arrayOf(
 				"HOME=${home.path}",
 				"TERM=xterm-256color",
 				"PATH=/system/bin:/system/xbin",
-				"PS1=${vm.name.replace(' ', '-').lowercase()}\$ ",
+				"ENV=${rc.path}",
 			)
 		val (fd, pid) = Native.ptySpawn("/system/bin/sh", arrayOf("-i"), environment, home.path, 24, 80).let { it[0].toInt() to it[1].toInt() }
 		val terminal = ParcelFileDescriptor.adoptFd(fd)
 		val banner =
-			"\u001b[1mRui demo backend\u001b[0m: this is a shell on the phone, not a virtual machine.\r\n" +
-				"It lets you try Rui's console where Android's Virtualization Framework isn't available.\r\n\r\n"
+			"\u001b[1mRui demo backend\u001b[0m\r\nA shell on this phone, not a VM.\r\n\r\n"
 		thread(name = "demo-wait-$pid", isDaemon = true) {
 			val status = Native.ptyWait(pid)
 			events.onStopped(if (status == 0) null else "The shell exited with status $status")
