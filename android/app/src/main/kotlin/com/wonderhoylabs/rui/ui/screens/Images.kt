@@ -20,6 +20,7 @@ import com.wonderhoylabs.rui.RuiApp
 import com.wonderhoylabs.rui.model.ImageRecord
 import com.wonderhoylabs.rui.service.gib
 import com.wonderhoylabs.rui.store.freeBytes
+import com.wonderhoylabs.rui.store.usage
 import com.wonderhoylabs.rui.ui.AppModel
 import com.wonderhoylabs.rui.ui.ConfirmDialog
 import com.wonderhoylabs.rui.ui.Screen
@@ -68,7 +69,7 @@ fun ImagesScreen(model: AppModel) {
 	deleting?.let { image ->
 		ConfirmDialog(
 			title = "Delete ${image.name}?",
-			text = "Machines made from it keep their own copies. This frees ${image.size.gib()}.",
+			text = "Machines made from it keep their own copies. This frees ${app.images.file(image).usage().used.gib()}.",
 			confirm = "Delete",
 			onConfirm = { app.images.delete(image.id) },
 			onDismiss = { deleting = null },
