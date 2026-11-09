@@ -64,7 +64,7 @@ fun HomeScreen(model: AppModel) {
 			if (uri == null) return@rememberLauncherForActivityResult
 			model.run("Importing a VM", { job ->
 				context.contentResolver.openFileDescriptor(uri, "r").use { fd ->
-					app.operations.importArchive(fd!!.fd, job)
+					app.operations.importArchive(fd!!.fd, fd.statSize, job)
 				}
 			}) { vm -> model.go(Screen.Detail(vm.id)) }
 		}

@@ -75,14 +75,26 @@ fn export_inner(
 	out: &Path,
 	progress: &mut dyn Progress,
 ) -> Result<()> {
+	let file = export_to(vm, disks, BufWriter::with_capacity(CHUNK, File::create(out)?), progress)?;
+	file.into_inner().map_err(|error| error.into_error())?.sync_all()?;
+	Ok(())
+}
+
+/// Writes an archive to any writer, such as a file descriptor the user picked, and returns the writer, flushed.
+/// On failure the caller removes whatever was written.
+pub fn export_to<W: Write>(
+	vm: &serde_json::Value,
+	disks: &[(String, PathBuf)],
+	out: W,
+	progress: &mut dyn Progress,
+) -> Result<W> {
 	let mut manifest = Manifest { format: FORMAT.to_string(), version: VERSION, vm: vm.clone(), disks: Vec::new() };
 	for (name, path) in disks {
 		check_name(name)?;
 		manifest.disks.push(ManifestDisk { file: name.clone(), size: std::fs::metadata(path)?.len() });
 	}
 	let total: u64 = manifest.disks.iter().map(|disk| disk.size).sum();
-	let file = BufWriter::with_capacity(CHUNK, File::create(out)?);
-	let mut tar = tar::Builder::new(GzEncoder::new(file, Compression::fast()));
+	let mut tar = tar::Builder::new(GzEncoder::new(out, Compression::fast()));
 	let json = serde_json::to_vec_pretty(&manifest).map_err(|error| Error::format(error.to_string()))?;
 	append_bytes(&mut tar, "manifest.json", &json)?;
 	let mut throttle = Throttle::new(progress);
@@ -110,10 +122,9 @@ fn export_inner(
 	}
 	append_bytes(&mut tar, "SHA256SUMS", sums.as_bytes())?;
 	let encoder = tar.into_inner()?;
-	let mut file = encoder.finish()?;
-	file.flush()?;
-	file.into_inner().map_err(|error| error.into_error())?.sync_all()?;
-	Ok(())
+	let mut out = encoder.finish()?;
+	out.flush()?;
+	Ok(out)
 }
 
 fn append_bytes<W: Write>(tar: &mut tar::Builder<W>, name: &str, data: &[u8]) -> Result<()> {
@@ -183,12 +194,12 @@ fn parse_manifest(reader: &mut dyn Read) -> Result<Manifest> {
 	Ok(manifest)
 }
 
-/// Unpacks an archive's disks into `dest_dir`, checking each against `SHA256SUMS`, and returns its manifest.
-/// Disks are written sparsely. If anything fails, nothing is left behind.
-pub fn import(archive: &Path, dest_dir: &Path, progress: &mut dyn Progress) -> Result<Manifest> {
+/// Like [`import`], from any reader, such as a file descriptor the user picked. `total` is its length for
+/// progress reports, or 0 if unknown.
+pub fn import_from<R: Read>(reader: R, total: u64, dest_dir: &Path, progress: &mut dyn Progress) -> Result<Manifest> {
 	std::fs::create_dir_all(dest_dir)?;
 	let mut written: Vec<PathBuf> = Vec::new();
-	let result = import_inner(archive, dest_dir, progress, &mut written);
+	let result = import_inner(reader, total, dest_dir, progress, &mut written);
 	if result.is_err() {
 		for path in written {
 			let _ = std::fs::remove_file(path);
@@ -197,14 +208,21 @@ pub fn import(archive: &Path, dest_dir: &Path, progress: &mut dyn Progress) -> R
 	result
 }
 
-fn import_inner(
-	archive: &Path,
+/// Unpacks an archive's disks into `dest_dir`, checking each against `SHA256SUMS`, and returns its manifest.
+/// Disks are written sparsely. If anything fails, nothing is left behind.
+pub fn import(archive: &Path, dest_dir: &Path, progress: &mut dyn Progress) -> Result<Manifest> {
+	let file = File::open(archive)?;
+	let total = file.metadata()?.len();
+	import_from(file, total, dest_dir, progress)
+}
+
+fn import_inner<R: Read>(
+	file: R,
+	total: u64,
 	dest_dir: &Path,
 	progress: &mut dyn Progress,
 	written: &mut Vec<PathBuf>,
 ) -> Result<Manifest> {
-	let file = File::open(archive)?;
-	let total = file.metadata()?.len();
 	let counter = std::rc::Rc::new(std::cell::Cell::new(0u64));
 	let reader = CountingReader { inner: BufReader::with_capacity(CHUNK, file), count: counter.clone() };
 	let mut tar = tar::Archive::new(GzDecoder::new(reader));
@@ -251,7 +269,9 @@ fn import_inner(
 				out.write_all_at(&buf[..n], offset)?;
 			}
 			offset += n as u64;
-			throttle.report(counter.get().min(total), total)?;
+			if total > 0 {
+				throttle.report(counter.get().min(total), total)?;
+			}
 		}
 		if offset != disk.size {
 			return Err(Error::format(format!("{} is cut short", disk.file)));
@@ -278,7 +298,9 @@ fn import_inner(
 		written.retain(|path| path != &part);
 		written.push(last);
 	}
-	throttle.report(total, total)?;
+	if total > 0 {
+		throttle.report(total, total)?;
+	}
 	Ok(manifest)
 }
 

@@ -32,6 +32,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -304,8 +306,11 @@ private fun SettingsForm(
 		if (cloudImage || source == Source.Termux) {
 			Section(title = "First boot") {
 				if (cloudImage) {
-					Row(verticalAlignment = Alignment.CenterVertically) {
-						Checkbox(checked = firstBoot, onCheckedChange = { firstBoot = it })
+					Row(
+							verticalAlignment = Alignment.CenterVertically,
+							modifier = Modifier.toggleable(value = firstBoot, role = Role.Checkbox, onValueChange = { firstBoot = it }),
+						) {
+						Checkbox(checked = firstBoot, onCheckedChange = null)
 						Text("Set up a user, SSH and Rui's guest agent with cloud-init")
 					}
 				}

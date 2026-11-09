@@ -60,13 +60,14 @@ object Native {
 	external fun exportArchive(
 		vmJson: String,
 		disksJson: String,
-		out: String,
+		outFd: Int,
 		progress: NativeProgress?,
 	)
 
 	@Throws(IOException::class)
 	external fun importArchive(
-		archive: String,
+		inFd: Int,
+		total: Long,
 		destDir: String,
 		progress: NativeProgress?,
 	): String

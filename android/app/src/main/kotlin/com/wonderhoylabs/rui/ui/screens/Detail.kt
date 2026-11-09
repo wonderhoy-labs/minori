@@ -40,6 +40,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
@@ -92,7 +94,13 @@ fun DetailScreen(
 		rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
 			if (uri == null) return@rememberLauncherForActivityResult
 			model.run("Exporting ${vm.name}", { job ->
-				context.contentResolver.openFileDescriptor(uri, "wt").use { fd -> app.operations.export(vm, fd!!.fd, exportSecrets, job) }
+				try {
+					context.contentResolver.openFileDescriptor(uri, "wt").use { fd -> app.operations.export(vm, fd!!.fd, exportSecrets, job) }
+				} catch (error: Throwable) {
+					// Don't leave a half-written archive where the user will find it.
+					runCatching { android.provider.DocumentsContract.deleteDocument(context.contentResolver, uri) }
+					throw error
+				}
 			}) { model.message.value = "Exported ${vm.name}." }
 		}
 
@@ -246,8 +254,11 @@ fun DetailScreen(
 			Section(title = "Notes") { Text(vm.notes) }
 		}
 		Section(title = "Copy, move or remove") {
-			Row(verticalAlignment = Alignment.CenterVertically) {
-				Checkbox(checked = exportSecrets, onCheckedChange = { exportSecrets = it })
+			Row(
+					verticalAlignment = Alignment.CenterVertically,
+					modifier = Modifier.toggleable(value = exportSecrets, role = Role.Checkbox, onValueChange = { exportSecrets = it }),
+				) {
+				Checkbox(checked = exportSecrets, onCheckedChange = null)
 				Text("Include its password in exports", style = MaterialTheme.typography.bodyMedium)
 			}
 			FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -283,8 +294,11 @@ fun DetailScreen(
 			},
 			onDismiss = { confirmDelete = false },
 			extra = {
-				Row(verticalAlignment = Alignment.CenterVertically) {
-					Checkbox(checked = keepDisks, onCheckedChange = { keepDisks = it })
+				Row(
+						verticalAlignment = Alignment.CenterVertically,
+						modifier = Modifier.toggleable(value = keepDisks, role = Role.Checkbox, onValueChange = { keepDisks = it }),
+					) {
+					Checkbox(checked = keepDisks, onCheckedChange = null)
 					Text("Keep its disks in Images")
 				}
 			},

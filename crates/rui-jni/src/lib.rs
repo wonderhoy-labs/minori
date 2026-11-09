@@ -210,45 +210,48 @@ struct ExportDisk {
 	path: PathBuf,
 }
 
-/// Writes a `.ruivm` archive. `disks` is a JSON list of `{"name", "path"}`.
+/// Writes a `.ruivm` archive into a file descriptor. `disks` is a JSON list of `{"name", "path"}`.
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_wonderhoylabs_rui_core_Native_exportArchive<'a>(
 	mut env: JNIEnv<'a>,
 	_class: JClass<'a>,
 	vm: JString<'a>,
 	disks: JString<'a>,
-	out: JString<'a>,
+	out_fd: jint,
 	callback: JObject<'a>,
 ) {
 	let inputs = (|| {
 		let vm: serde_json::Value = serde_json::from_str(&string(&mut env, &vm)?).map_err(|error| error.to_string())?;
 		let disks: Vec<ExportDisk> =
 			serde_json::from_str(&string(&mut env, &disks)?).map_err(|error| error.to_string())?;
-		Ok::<_, String>((vm, disks, string(&mut env, &out)?))
+		Ok::<_, String>((vm, disks))
 	})();
-	let result = inputs.and_then(|(vm, disks, out)| {
+	let result = inputs.and_then(|(vm, disks)| {
 		let pairs: Vec<(String, PathBuf)> = disks.into_iter().map(|disk| (disk.name, disk.path)).collect();
+		let out = std::io::BufWriter::with_capacity(1 << 20, owned_fd(out_fd)?);
 		let mut progress = JavaProgress { env: &mut env, callback: &callback };
-		archive::export(&vm, &pairs, Path::new(&out), &mut progress).map_err(core_error)
+		let out = archive::export_to(&vm, &pairs, out, &mut progress).map_err(core_error)?;
+		out.into_inner().map_err(|error| error.to_string())?.sync_all().map_err(|error| error.to_string())
 	});
 	if let Err(message) = result {
 		throw(&mut env, &message);
 	}
 }
 
-/// Unpacks a `.ruivm` archive into a folder, returning its manifest as JSON.
+/// Unpacks a `.ruivm` archive from a file descriptor into a folder, returning its manifest as JSON.
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_wonderhoylabs_rui_core_Native_importArchive<'a>(
 	mut env: JNIEnv<'a>,
 	_class: JClass<'a>,
-	archive_path: JString<'a>,
+	in_fd: jint,
+	total: jlong,
 	dest: JString<'a>,
 	callback: JObject<'a>,
 ) -> jstring {
-	let paths = string(&mut env, &archive_path).and_then(|src| Ok((src, string(&mut env, &dest)?)));
-	let result = paths.and_then(|(src, dest)| {
+	let result = string(&mut env, &dest).and_then(|dest| {
+		let file = owned_fd(in_fd)?;
 		let mut progress = JavaProgress { env: &mut env, callback: &callback };
-		archive::import(Path::new(&src), Path::new(&dest), &mut progress).map_err(core_error)
+		archive::import_from(file, total.max(0) as u64, Path::new(&dest), &mut progress).map_err(core_error)
 	});
 	match result.and_then(|manifest| json(&manifest)) {
 		Ok(text) => to_jstring(&mut env, &text),
@@ -344,6 +347,18 @@ pub extern "system" fn Java_com_wonderhoylabs_rui_core_Native_ptySpawn<'a>(
 			std::ptr::null_mut()
 		}
 	}
+}
+
+/// Duplicates a descriptor Kotlin owns, so Rust can close its copy without closing Kotlin's.
+fn owned_fd(fd: jint) -> Result<std::fs::File, String> {
+	use std::os::fd::FromRawFd;
+	// SAFETY: dup returns a new descriptor or -1; a new one is owned by the File alone.
+	let copy = unsafe { libc::dup(fd) };
+	if copy < 0 {
+		return Err(std::io::Error::last_os_error().to_string());
+	}
+	// SAFETY: copy is a fresh descriptor nothing else owns.
+	Ok(unsafe { std::fs::File::from_raw_fd(copy) })
 }
 
 fn strings(env: &mut JNIEnv, array: &jni::objects::JObjectArray) -> Result<Vec<String>, String> {

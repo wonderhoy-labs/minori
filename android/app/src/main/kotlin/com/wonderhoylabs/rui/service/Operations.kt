@@ -377,18 +377,19 @@ class Operations(
 					)
 				}
 			}.toString()
-		Native.exportArchive(json, disks, "/proc/self/fd/$outFd", job.native("Packing ${vm.name}"))
+		Native.exportArchive(json, disks, outFd, job.native("Packing ${vm.name}"))
 	}
 
 	/** Imports a `.ruivm` archive from [inFd] as a new machine. */
 	fun importArchive(
 		inFd: Int,
+		total: Long,
 		job: Job,
 	): VmConfig {
 		val id = UUID.randomUUID().toString()
 		val dir = vms.dir(id)
 		try {
-			val manifest = RuiJson.parseToJsonElement(Native.importArchive("/proc/self/fd/$inFd", dir.path, job.native("Unpacking"))).jsonObject
+			val manifest = RuiJson.parseToJsonElement(Native.importArchive(inFd, total, dir.path, job.native("Unpacking"))).jsonObject
 			val stored = RuiJson.decodeFromJsonElement(VmConfig.serializer(), manifest["vm"] ?: throw IOException("The archive has no VM settings"))
 			var vm = stored.copy(id = id, createdAt = System.currentTimeMillis())
 			// The kernel isn't in the archive; it comes from the boot disk again.
