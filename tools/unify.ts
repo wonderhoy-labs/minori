@@ -125,11 +125,20 @@ export function badges(brand: Brand): string[] {
 	];
 }
 
+/** The template has no logo, and a project waiting for one says so under "Exceptions to the guideline". */
+function logoWaived(brand: Brand | undefined): boolean {
+	if (brand?.id === "template") return true;
+	if (!exists("AGENTS.md")) return false;
+	const exceptions = read("AGENTS.md").split("## Exceptions to the guideline")[1] ?? "";
+	return exceptions.includes("docs/logo.webp");
+}
+
 function checkLayout(files: string[], brand: Brand | undefined) {
 	for (const path of REQUIRED) if (!exists(path)) fail(`${path} is missing`);
-	// The logo is the maintainer's own art. Agents never make one, so the template has none.
+	// The logo is the maintainer's own art. Agents never make one, so the template has none, and a new project can
+	// wait for its logo by saying so under "Exceptions to the guideline" in AGENTS.md.
 	if (!exists("docs/logo.webp")) {
-		if (brand?.id === "template") warnings.push("docs/logo.webp is missing; the maintainer adds it");
+		if (logoWaived(brand)) warnings.push("docs/logo.webp is missing; the maintainer adds it");
 		else fail("docs/logo.webp is missing; ask the maintainer for the project's logo, never generate one");
 	}
 	const top = new Set(files.map((file) => file.split("/")[0] ?? file));
@@ -228,7 +237,7 @@ function checkReadme(brand: Brand) {
 	const readme = read("README.md");
 	const head = readme.slice(0, 2000);
 	const logo = '<p align="center">\n  <img src="docs/logo.webp" alt="" width="180">\n</p>';
-	if (brand.id !== "template" && !head.startsWith(logo)) {
+	if ((exists("docs/logo.webp") || !logoWaived(brand)) && !head.startsWith(logo)) {
 		fail("README.md has to open with the centred logo");
 	}
 	if (!head.includes(`<h1 align="center">${brand.name}</h1>`)) fail(`README.md's title has to be ${brand.name}`);
