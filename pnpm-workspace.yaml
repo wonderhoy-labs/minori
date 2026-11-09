@@ -1,4 +1,4 @@
-# Rui has no web app yet, so the workspace is just the shared tools at the top.
+# Minori has no web app yet, so the workspace is just the shared tools at the top.
 packages: []
 
 # Install scripts are off unless a package is allowed here, as `name: true`.

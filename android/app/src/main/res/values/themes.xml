@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 	<!-- Compose draws everything. This only covers the moment before it does. -->
-	<style name="Theme.Rui" parent="android:Theme.Material.Light.NoActionBar">
+	<style name="Theme.Minori" parent="android:Theme.Material.Light.NoActionBar">
 		<item name="android:windowBackground">@color/window_background</item>
 		<item name="android:statusBarColor">@android:color/transparent</item>
 		<item name="android:navigationBarColor">@android:color/transparent</item>

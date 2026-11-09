@@ -38,11 +38,12 @@
 	</queries>
 
 	<application
-		android:name=".RuiApp"
+		android:name=".MinoriApp"
 		android:allowBackup="false"
+		android:icon="@mipmap/ic_launcher"
 		android:label="@string/app_name"
 		android:supportsRtl="true"
-		android:theme="@style/Theme.Rui">
+		android:theme="@style/Theme.Minori">
 
 		<activity
 			android:name=".ui.MainActivity"
@@ -55,18 +56,18 @@
 				<action android:name="android.intent.action.MAIN" />
 				<category android:name="android.intent.category.LAUNCHER" />
 			</intent-filter>
-			<!-- rui://vm/<id>[/console|ssh|vnc] opens a machine's page or one of its screens. It never starts anything. -->
+			<!-- minori://vm/<id>[/console|ssh|vnc] opens a machine's page or one of its screens. It never starts anything. -->
 			<intent-filter>
 				<action android:name="android.intent.action.VIEW" />
 				<category android:name="android.intent.category.DEFAULT" />
 				<data
 					android:host="vm"
-					android:scheme="rui" />
+					android:scheme="minori" />
 			</intent-filter>
 		</activity>
 
 		<service
-			android:name=".service.RuiService"
+			android:name=".service.MinoriService"
 			android:exported="false"
 			android:foregroundServiceType="specialUse">
 			<property

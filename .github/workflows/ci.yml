@@ -18,12 +18,12 @@ jobs:
   checks:
     uses: wonderhoy-labs/.github/.github/workflows/checks.yml@main
 
-  # The rui command-line tool prepares and checks images on a computer. rui-core, rui-jni and rui-agent are tested
+  # The minori command-line tool prepares and checks images on a computer. minori-core, minori-jni and minori-agent are tested
   # here too.
   rust:
     uses: wonderhoy-labs/.github/.github/workflows/rust.yml@main
     with:
-      package: rui
+      package: minori
       targets: >-
         [
           {"os": "ubuntu-24.04", "target": "x86_64-unknown-linux-gnu"},
@@ -32,18 +32,18 @@ jobs:
           {"os": "macos-latest", "target": "x86_64-apple-darwin"}
         ]
 
-  # The app carries rui-jni for every Android ABI, and rui-agent built for 64-bit Arm Linux guests.
+  # The app carries minori-jni for every Android ABI, and minori-agent built for 64-bit Arm Linux guests.
   android:
     uses: wonderhoy-labs/.github/.github/workflows/android.yml@main
     with:
-      name: rui
-      env-prefix: RUI
+      name: minori
+      env-prefix: MINORI
       rust-targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android,aarch64-unknown-linux-musl
     secrets:
-      KEYSTORE_BASE64: ${{ secrets.RUI_KEYSTORE_BASE64 }}
-      KEYSTORE_PASSWORD: ${{ secrets.RUI_KEYSTORE_PASSWORD }}
-      KEY_ALIAS: ${{ secrets.RUI_KEY_ALIAS }}
-      KEY_PASSWORD: ${{ secrets.RUI_KEY_PASSWORD }}
+      KEYSTORE_BASE64: ${{ secrets.MINORI_KEYSTORE_BASE64 }}
+      KEYSTORE_PASSWORD: ${{ secrets.MINORI_KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.MINORI_KEY_ALIAS }}
+      KEY_PASSWORD: ${{ secrets.MINORI_KEY_PASSWORD }}
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -54,4 +54,4 @@ jobs:
       attestations: write
     uses: wonderhoy-labs/.github/.github/workflows/release.yml@main
     with:
-      title: Rui
+      title: Minori

@@ -1,0 +1,22 @@
+[package]
+name = "minori-jni"
+description = "minori-core's image tools and pseudo-terminals, for Minori's Android app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+jni = { version = "0.21", default-features = false }
+libc = "0.2"
+minori-core = { path = "../minori-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

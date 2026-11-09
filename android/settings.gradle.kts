@@ -14,5 +14,5 @@ dependencyResolutionManagement {
 	}
 }
 
-rootProject.name = "rui"
+rootProject.name = "minori"
 include(":app", ":avf-stubs")

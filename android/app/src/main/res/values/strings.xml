@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-	<string name="app_name">Rui</string>
+	<string name="app_name">Minori</string>
 	<string name="notification_channel">Running machines</string>
-	<string name="notification_text">Rui keeps running so they do.</string>
+	<string name="notification_text">Minori keeps running so they do.</string>
 	<string name="stop_all">Stop all</string>
 	<plurals name="machines_running">
 		<item quantity="one">%d machine running</item>

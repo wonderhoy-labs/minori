@@ -1,5 +1,5 @@
 {
-	"name": "rui",
+	"name": "minori",
 	"private": true,
 	"type": "module",
 	"license": "Apache-2.0",
@@ -8,11 +8,11 @@
 		"node": ">=24"
 	},
 	"wonderhoy": {
-		"name": "Rui",
+		"name": "Minori",
 		"tagline": "Your Pixel's hypervisor.",
-		"character": "Kamishiro Rui",
-		"unit": "Wonderlands×Showtime",
-		"color": "#BB88EE"
+		"character": "Hanasato Minori",
+		"unit": "MORE MORE JUMP!",
+		"color": "#FFCCAA"
 	},
 	"scripts": {
 		"lint": "biome ci",

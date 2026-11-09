@@ -11,17 +11,17 @@ val appVersionCode =
 		major * 10_000 + minor * 100 + patch
 	}
 
-// Pass -Prui.abis=arm64-v8a to build faster for one kind of device. AVF only exists on 64-bit Arm phones, but the
-// rest of Rui (images, archives, the Termux backend) works on every ABI.
-val abis = (findProperty("rui.abis") as String? ?: "arm64-v8a,armeabi-v7a,x86_64").split(",")
+// Pass -Pminori.abis=arm64-v8a to build faster for one kind of device. AVF only exists on 64-bit Arm phones, but the
+// rest of Minori (images, archives, the Termux backend) works on every ABI.
+val abis = (findProperty("minori.abis") as String? ?: "arm64-v8a,armeabi-v7a,x86_64").split(",")
 
 android {
-	namespace = "com.wonderhoylabs.rui"
+	namespace = "com.wonderhoylabs.minori"
 	compileSdk = 37
 	ndkVersion = "30.0.16248370"
 
 	defaultConfig {
-		applicationId = "com.wonderhoylabs.rui"
+		applicationId = "com.wonderhoylabs.minori"
 		minSdk = 29
 		targetSdk = 37
 		versionCode = appVersionCode
@@ -33,12 +33,12 @@ android {
 	// Set these to sign with your own key. Without them a release APK still installs, because it
 	// falls back to the debug key, but Android refuses to update an app across different keys.
 	signingConfigs {
-		System.getenv("RUI_KEYSTORE")?.let { keystore ->
+		System.getenv("MINORI_KEYSTORE")?.let { keystore ->
 			create("release") {
 				storeFile = file(keystore)
-				storePassword = System.getenv("RUI_KEYSTORE_PASSWORD")
-				keyAlias = System.getenv("RUI_KEY_ALIAS")
-				keyPassword = System.getenv("RUI_KEY_PASSWORD")
+				storePassword = System.getenv("MINORI_KEYSTORE_PASSWORD")
+				keyAlias = System.getenv("MINORI_KEY_ALIAS")
+				keyPassword = System.getenv("MINORI_KEY_PASSWORD")
 			}
 		}
 	}
@@ -71,7 +71,7 @@ android {
 	sourceSets["main"].assets.directories.add(layout.buildDirectory.dir("rust/assets").get().asFile.path)
 }
 
-// rui-jni holds rui-core's image tools and the pseudo-terminals for local consoles.
+// minori-jni holds minori-core's image tools and the pseudo-terminals for local consoles.
 val buildRust =
 	tasks.register<Exec>("buildRust") {
 		val output = layout.buildDirectory.dir("rust/jniLibs")
@@ -84,26 +84,26 @@ val buildRust =
 		commandLine(
 			listOf("cargo", "ndk", "--platform", "29", "-o", output.get().asFile.path) +
 				abis.flatMap { listOf("-t", it) } +
-				listOf("build", "--release", "-p", "rui-jni"),
+				listOf("build", "--release", "-p", "minori-jni"),
 		)
 	}
 
-// rui-agent runs inside 64-bit Arm Linux guests, so it's built for them and shipped as an asset that first boot
+// minori-agent runs inside 64-bit Arm Linux guests, so it's built for them and shipped as an asset that first boot
 // copies in. It's static and needs no C toolchain.
 val buildAgent =
 	tasks.register<Exec>("buildAgent") {
 		val output = layout.buildDirectory.dir("rust/assets")
 		workingDir = rootProject.projectDir.parentFile
-		inputs.dir(rootProject.file("../crates/rui-agent"))
+		inputs.dir(rootProject.file("../crates/minori-agent"))
 		inputs.file(rootProject.file("../Cargo.lock"))
 		outputs.dir(output)
 		environment("CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER", "rust-lld")
-		commandLine("cargo", "build", "--release", "-p", "rui-agent", "--target", "aarch64-unknown-linux-musl")
+		commandLine("cargo", "build", "--release", "-p", "minori-agent", "--target", "aarch64-unknown-linux-musl")
 		doLast {
-			val agent = rootProject.file("../target/aarch64-unknown-linux-musl/release/rui-agent")
+			val agent = rootProject.file("../target/aarch64-unknown-linux-musl/release/minori-agent")
 			val dir = output.get().asFile
 			dir.mkdirs()
-			agent.copyTo(dir.resolve("rui-agent-aarch64"), overwrite = true)
+			agent.copyTo(dir.resolve("minori-agent-aarch64"), overwrite = true)
 		}
 	}
 

@@ -145,7 +145,6 @@ them in one repository. If a project truly needs to differ, write the exception 
    create the repository from wonderhoy-labs/template.
 2. Set the `wonderhoy` block and `name` in `package.json`, rename `template` everywhere (package names, the
    Android namespace and folders, the crate), run `pnpm theme`, and delete the parts the project doesn't need.
-3. Ask the maintainer for the logo and launcher icon. Don't make them. Until they arrive, list `docs/logo.webp`
-   under "Exceptions to the guideline" in `AGENTS.md`, and `pnpm unify` warns instead of failing.
+3. Ask the maintainer for the logo and launcher icon. Don't make them.
 4. Rewrite `README.md` and `AGENTS.md` for the project, and keep `pnpm unify` passing.
 5. On release, add the project to the org profile in wonderhoy-labs/.github.

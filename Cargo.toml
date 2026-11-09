@@ -6,7 +6,7 @@ members = ["crates/*"]
 version = "0.1.0"
 edition = "2024"
 license = "Apache-2.0"
-repository = "https://github.com/wonderhoy-labs/rui"
+repository = "https://github.com/wonderhoy-labs/minori"
 publish = false
 rust-version = "1.91"
 

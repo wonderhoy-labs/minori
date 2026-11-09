@@ -6,7 +6,7 @@ plugins {
 // The app only compiles against them (compileOnly), and the real classes come from the com.android.virt module on
 // the phone. Signatures and constants are copied from framework-virtualization.jar on Android 17.
 android {
-	namespace = "com.wonderhoylabs.rui.avfstubs"
+	namespace = "com.wonderhoylabs.minori.avfstubs"
 	compileSdk = 37
 
 	defaultConfig {

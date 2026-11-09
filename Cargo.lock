@@ -373,6 +373,47 @@ dependencies = [
 ]
 
 [[package]]
+name = "minori"
+version = "0.1.0"
+dependencies = [
+ "minori-core",
+ "serde_json",
+]
+
+[[package]]
+name = "minori-agent"
+version = "0.1.0"
+dependencies = [
+ "libc",
+]
+
+[[package]]
+name = "minori-core"
+version = "0.1.0"
+dependencies = [
+ "ext4-view",
+ "fatfs",
+ "flate2",
+ "hex",
+ "ruzstd",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tar",
+]
+
+[[package]]
+name = "minori-jni"
+version = "0.1.0"
+dependencies = [
+ "jni",
+ "libc",
+ "minori-core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "num-traits"
 version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -403,47 +444,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1fbf4db142a473a8d80c26bbf18454ed458bf8d26c8219c331daecfdbd079001"
 dependencies = [
  "proc-macro2",
-]
-
-[[package]]
-name = "rui"
-version = "0.1.0"
-dependencies = [
- "rui-core",
- "serde_json",
-]
-
-[[package]]
-name = "rui-agent"
-version = "0.1.0"
-dependencies = [
- "libc",
-]
-
-[[package]]
-name = "rui-core"
-version = "0.1.0"
-dependencies = [
- "ext4-view",
- "fatfs",
- "flate2",
- "hex",
- "ruzstd",
- "serde",
- "serde_json",
- "sha2",
- "tar",
-]
-
-[[package]]
-name = "rui-jni"
-version = "0.1.0"
-dependencies = [
- "jni",
- "libc",
- "rui-core",
- "serde",
- "serde_json",
 ]
 
 [[package]]

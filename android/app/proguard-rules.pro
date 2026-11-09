@@ -2,11 +2,11 @@
 -dontwarn android.system.virtualmachine.**
 
 # Shizuku starts ShellService by name, through its constructor, in its own process.
--keep class com.wonderhoylabs.rui.setup.ShellService { <init>(); }
+-keep class com.wonderhoylabs.minori.setup.ShellService { <init>(); }
 
 # JNI looks these up by name.
--keep class com.wonderhoylabs.rui.core.Native { native <methods>; }
--keep interface com.wonderhoylabs.rui.core.NativeProgress { *; }
+-keep class com.wonderhoylabs.minori.core.Native { native <methods>; }
+-keep interface com.wonderhoylabs.minori.core.NativeProgress { *; }
 
 # JSch loads its algorithms by class name.
 -keep class com.jcraft.jsch.** { *; }
