@@ -50,6 +50,8 @@ fn serve_tcp(address: &str) -> io::Result<()> {
 	eprintln!("minori-agent: listening on {address}");
 	for stream in listener.incoming() {
 		let stream = stream?;
+		// Packets for the guest's internet are small and mustn't wait for one another.
+		let _ = stream.set_nodelay(true);
 		thread::spawn(move || {
 			let reader = stream.try_clone();
 			if let Ok(reader) = reader {

@@ -97,7 +97,8 @@ pub(crate) fn serve<R: Read + Send + 'static, W: Write + Send + 'static>(
 		let stop = std::sync::Arc::new(AtomicBool::new(false));
 		let stopped = stop.clone();
 		let up = thread::spawn(move || {
-			let mut buf = vec![0u8; 65_535];
+			// The length and the packet go out in one write, so neither waits on the other's acknowledgement.
+			let mut buf = vec![0u8; 2 + 65_535];
 			loop {
 				// Wakes twice a second to notice the phone has gone, so the device is closed and can be made again.
 				let mut poll = libc::pollfd { fd: tun_reader.as_raw_fd(), events: libc::POLLIN, revents: 0 };
@@ -109,17 +110,12 @@ pub(crate) fn serve<R: Read + Send + 'static, W: Write + Send + 'static>(
 				if ready <= 0 {
 					continue;
 				}
-				let Ok(n) = tun_reader.read(&mut buf) else { break };
+				let Ok(n) = tun_reader.read(&mut buf[2..]) else { break };
 				if n == 0 {
 					break;
 				}
-				let header = (n as u16).to_be_bytes();
-				if to_phone
-					.write_all(&header)
-					.and_then(|()| to_phone.write_all(&buf[..n]))
-					.and_then(|()| to_phone.flush())
-					.is_err()
-				{
+				buf[..2].copy_from_slice(&(n as u16).to_be_bytes());
+				if to_phone.write_all(&buf[..2 + n]).and_then(|()| to_phone.flush()).is_err() {
 					break;
 				}
 			}
