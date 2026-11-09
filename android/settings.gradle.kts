@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "rui"
-include(":app")
+include(":app", ":avf-stubs")

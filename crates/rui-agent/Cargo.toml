@@ -1,0 +1,15 @@
+[package]
+name = "rui-agent"
+description = "Runs inside a Rui guest and connects the phone's published ports to the guest's own services over vsock"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+libc = "0.2"

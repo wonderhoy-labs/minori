@@ -1,19 +1,85 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:tools="http://schemas.android.com/tools">
+
+	<!-- Run VMs at all, and boot a Linux kernel that isn't Microdroid. Granted with adb or Shizuku. -->
+	<uses-permission
+		android:name="android.permission.MANAGE_VIRTUAL_MACHINE"
+		tools:ignore="ProtectedPermissions" />
+	<uses-permission
+		android:name="android.permission.USE_CUSTOM_VIRTUAL_MACHINE"
+		tools:ignore="ProtectedPermissions" />
+	<!-- Downloading catalog images, and published ports that other devices may reach. -->
+	<uses-permission android:name="android.permission.INTERNET" />
+	<!-- Keeps the process, and so its VMs, alive while machines run. -->
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+	<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+	<!-- The Termux backend runs proot-distro through Termux's documented RUN_COMMAND intent. -->
+	<uses-permission android:name="com.termux.permission.RUN_COMMAND" />
+	<uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
+
+	<uses-feature
+		android:name="android.software.virtualization_framework"
+		android:required="false" />
+
+	<queries>
+		<package android:name="moe.shizuku.privileged.api" />
+		<package android:name="com.termux" />
+		<intent>
+			<action android:name="android.intent.action.VIEW" />
+			<data android:scheme="rdp" />
+		</intent>
+		<intent>
+			<action android:name="android.intent.action.VIEW" />
+			<data android:scheme="ssh" />
+		</intent>
+	</queries>
 
 	<application
+		android:name=".RuiApp"
 		android:allowBackup="false"
 		android:label="@string/app_name"
 		android:supportsRtl="true"
-		android:theme="@style/Theme.Template">
+		android:theme="@style/Theme.Rui">
 
 		<activity
 			android:name=".ui.MainActivity"
-			android:exported="true">
+			android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|density|uiMode"
+			android:exported="true"
+			android:launchMode="singleTask"
+			android:resizeableActivity="true"
+			android:windowSoftInputMode="adjustResize">
 			<intent-filter>
 				<action android:name="android.intent.action.MAIN" />
 				<category android:name="android.intent.category.LAUNCHER" />
 			</intent-filter>
 		</activity>
+
+		<service
+			android:name=".service.RuiService"
+			android:exported="false"
+			android:foregroundServiceType="specialUse">
+			<property
+				android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+				android:value="Runs the virtual machines the user started, which live in this app's process." />
+		</service>
+
+		<receiver
+			android:name=".service.BootReceiver"
+			android:exported="false">
+			<intent-filter>
+				<action android:name="android.intent.action.BOOT_COMPLETED" />
+			</intent-filter>
+		</receiver>
+
+		<provider
+			android:name="rikka.shizuku.ShizukuProvider"
+			android:authorities="${applicationId}.shizuku"
+			android:enabled="true"
+			android:exported="true"
+			android:multiprocess="false"
+			android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
 	</application>
 </manifest>

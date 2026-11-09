@@ -5,6 +5,7 @@
 //! [`CloudConfig`] writes the settings Rui uses.
 
 use crate::{Error, Result};
+use serde::{Deserialize, Serialize};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::Path;
@@ -12,7 +13,8 @@ use std::path::Path;
 const SEED_SIZE: u64 = 4 << 20;
 
 /// A file for cloud-init to write into the guest on first boot.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct GuestFile {
 	/// Where it goes in the guest.
 	pub path: String,
@@ -20,10 +22,13 @@ pub struct GuestFile {
 	pub content: String,
 	/// Octal permissions, like `0755`.
 	pub permissions: String,
+	/// `"b64"` if `content` is base64, for binaries. Empty for plain text.
+	pub encoding: String,
 }
 
 /// The first-boot settings for a cloud image.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct CloudConfig {
 	/// The guest's hostname.
 	pub hostname: String,
@@ -90,6 +95,9 @@ impl CloudConfig {
 			for file in &self.files {
 				out.push_str(&format!("  - path: {}\n", quote(&file.path)));
 				out.push_str(&format!("    permissions: {}\n", quote(&file.permissions)));
+				if !file.encoding.is_empty() {
+					out.push_str(&format!("    encoding: {}\n", quote(&file.encoding)));
+				}
 				out.push_str(&format!("    content: {}\n", quote(&file.content)));
 			}
 		}
