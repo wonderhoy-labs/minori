@@ -180,6 +180,8 @@ phone was used**: the maintainer's Pixel 10 Pro was unavailable, so nothing has 
 | VNC to the guest's TigerVNC with a VNC password: live updates, pointer                            | Same                                        | Pass   |
 | Export to `.ruivm` through the file picker (403 MB for an 8 GiB disk), import it back, clone, delete keeping disks | Same emulator | Pass   |
 | Helper socket with `tools/rui-client.ts`: hello, list, start, ports, connect to SSH               | Same, with the real guest                   | Pass   |
+| A UDP port: a datagram from the emulator to the guest's echo service through `rui-agent`, and back | Same, with the real guest | Pass |
+| Termux backend: Termux 0.118.3 (GitHub release), proot-distro installed Debian 13 and sshd on first start (about 3 minutes), Rui's console logged in as root, shut down, started again in 10 s | Same emulator | Pass |
 | `rui://vm/Debian/console`                                                                         | Same emulator                               | Opens the console |
 | Release build: start, list, settings, JNI disk usage                                              | Same emulator                               | Pass   |
 
@@ -190,8 +192,8 @@ phone was used**: the maintainer's Pixel 10 Pro was unavailable, so nothing has 
   lets a non-system app do. [docs/avf.md](docs/avf.md) has the details.
 - Catalog downloads in the app (Debian's image was downloaded and checked on the Mac instead), and the Ubuntu,
   Fedora, KDE Plasma and Chromium templates.
-- The Termux backend, UDP ports, the RDP and "SSH in another app" buttons, auto-start at boot, growing a disk
-  from Edit, and the helper's `console` stream.
+- The RDP and "SSH in another app" buttons, auto-start at boot, growing a disk from Edit, the helper's
+  `console` stream, and the Termux backend's other distributions (Ubuntu, Arch, Alpine, Fedora).
 - Refusing a non-adb app on the helper socket. Rui checks the peer's uid, but no other app tried.
 
 ## How it works
@@ -207,8 +209,8 @@ Rui exempts that one package for its own process. More in [docs/avf.md](docs/avf
 ### Disks and images
 
 Every VM disk is a raw, sparse file in Rui's private storage, so it takes only the space the guest writes and grows
-with a `truncate`. qcow2 images are converted on import, ISOs are attached read-only, and installer ISOs for Debian,
-Ubuntu, Fedora and Alpine boot their own installer kernel.
+with a `truncate`. qcow2 images are converted on import, and ISOs are attached read-only. Rui knows where Debian, Ubuntu, Fedora and
+Alpine ISOs keep their installer kernels and boots those; only Alpine's has been tried, under QEMU.
 
 ### First boot
 

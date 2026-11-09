@@ -190,7 +190,9 @@ class PortForwarder {
 					continue
 				}
 				val session =
-					sessions[from] ?: runCatching { openUdp(guest, published.guestPort, socket, from, sessions) }.getOrNull()
+					sessions[from] ?: runCatching { openUdp(guest, published.guestPort, socket, from, sessions) }
+						.onFailure { Log.i(TAG, "UDP to guest port ${published.guestPort} failed: ${it.message}") }
+						.getOrNull()
 				if (session == null) continue
 				runCatching {
 					synchronized(session) {
