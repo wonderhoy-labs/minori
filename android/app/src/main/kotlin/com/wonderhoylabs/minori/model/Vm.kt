@@ -125,8 +125,8 @@ data class PortForward(
 
 @Serializable
 data class NetworkSettings(
-	/** Gives the guest AVF's own network, which reaches the internet through the phone. */
-	val internet: Boolean = false,
+	/** Gives the guest internet through the phone, with Minori's NAT and the guest's agent. */
+	val internet: Boolean = true,
 	val forwards: List<PortForward> = emptyList(),
 )
 

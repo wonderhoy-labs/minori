@@ -6,6 +6,7 @@
 
 #![allow(non_snake_case)]
 
+mod nat;
 mod pty;
 
 use jni::JNIEnv;
@@ -402,4 +403,93 @@ pub extern "system" fn Java_com_wonderhoylabs_minori_core_Native_ptyKill<'a>(
 	signal: jint,
 ) -> jboolean {
 	u8::from(pty::kill(pid, signal))
+}
+
+/// Starts a NAT for one guest's internet, returning a handle for the other calls, or 0 if it couldn't start.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_wonderhoylabs_minori_core_Native_natStart<'a>(
+	mut env: JNIEnv<'a>,
+	_class: JClass<'a>,
+) -> jlong {
+	match nat::Engine::start() {
+		Ok(engine) => Box::into_raw(Box::new(engine)) as jlong,
+		Err(error) => {
+			throw(&mut env, &format!("Couldn't start the guest's network: {error}"));
+			0
+		}
+	}
+}
+
+/// Hands the NAT an IP packet from the guest.
+///
+/// # Safety
+/// The handle has to come from `natStart` and not have been freed.
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_com_wonderhoylabs_minori_core_Native_natInput<'a>(
+	env: JNIEnv<'a>,
+	_class: JClass<'a>,
+	handle: jlong,
+	packet: jni::objects::JByteArray<'a>,
+	length: jint,
+) {
+	// SAFETY: the caller keeps the handle alive until natFree.
+	let engine = unsafe { &*(handle as *const nat::Engine) };
+	let mut bytes = vec![0i8; length.max(0) as usize];
+	if env.get_byte_array_region(&packet, 0, &mut bytes).is_ok() {
+		engine.input(bytes.into_iter().map(|byte| byte as u8).collect());
+	}
+}
+
+/// Waits for an IP packet for the guest and copies it into `buffer`. Returns its length, or -1 once stopped.
+///
+/// # Safety
+/// The handle has to come from `natStart` and not have been freed.
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_com_wonderhoylabs_minori_core_Native_natOutput<'a>(
+	env: JNIEnv<'a>,
+	_class: JClass<'a>,
+	handle: jlong,
+	buffer: jni::objects::JByteArray<'a>,
+) -> jint {
+	// SAFETY: the caller keeps the handle alive until natFree.
+	let engine = unsafe { &*(handle as *const nat::Engine) };
+	let Some(packet) = engine.output() else { return -1 };
+	let capacity = env.get_array_length(&buffer).unwrap_or(0).max(0) as usize;
+	let length = packet.len().min(capacity);
+	let signed: Vec<i8> = packet[..length].iter().map(|byte| *byte as i8).collect();
+	if env.set_byte_array_region(&buffer, 0, &signed).is_err() {
+		return -1;
+	}
+	length as jint
+}
+
+/// Ends the NAT's connections. A thread waiting in natOutput returns -1.
+///
+/// # Safety
+/// The handle has to come from `natStart` and not have been freed.
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_com_wonderhoylabs_minori_core_Native_natStop<'a>(
+	_env: JNIEnv<'a>,
+	_class: JClass<'a>,
+	handle: jlong,
+) {
+	// SAFETY: the caller keeps the handle alive until natFree.
+	let engine = unsafe { &*(handle as *const nat::Engine) };
+	engine.stop();
+}
+
+/// Frees a stopped NAT. Call it once nothing else uses the handle.
+///
+/// # Safety
+/// The handle has to come from `natStart`, be stopped, and not be used again.
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_com_wonderhoylabs_minori_core_Native_natFree<'a>(
+	_env: JNIEnv<'a>,
+	_class: JClass<'a>,
+	handle: jlong,
+) {
+	if handle != 0 {
+		// SAFETY: the handle came from Box::into_raw in natStart and is freed once.
+		drop(unsafe { Box::from_raw(handle as *mut nat::Engine) });
+	}
 }

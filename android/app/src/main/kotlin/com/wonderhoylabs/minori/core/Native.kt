@@ -62,5 +62,25 @@ object Native {
 
 	external fun ptyWait(pid: Int): Int
 
+	/** Starts a NAT for a guest's internet. Returns a handle for the calls below. */
+	@Throws(IOException::class)
+	external fun natStart(): Long
+
+	external fun natInput(
+		handle: Long,
+		packet: ByteArray,
+		length: Int,
+	)
+
+	/** Blocks until there's a packet for the guest; returns its length, or -1 once stopped. */
+	external fun natOutput(
+		handle: Long,
+		buffer: ByteArray,
+	): Int
+
+	external fun natStop(handle: Long)
+
+	external fun natFree(handle: Long)
+
 	external fun ptyKill(pid: Int, signal: Int): Boolean
 }

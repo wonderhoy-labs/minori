@@ -8,6 +8,8 @@ import com.wonderhoylabs.minori.backend.Hypervisor
 import com.wonderhoylabs.minori.backend.RunningGuest
 import com.wonderhoylabs.minori.model.BackendKind
 import com.wonderhoylabs.minori.model.VmState
+import com.wonderhoylabs.minori.net.AgentGuest
+import com.wonderhoylabs.minori.net.GuestNetwork
 import com.wonderhoylabs.minori.net.PortForwarder
 import com.wonderhoylabs.minori.store.VmStore
 import com.wonderhoylabs.minori.terminal.TerminalSession
@@ -41,6 +43,27 @@ class Machines(
 	private val guests = ConcurrentHashMap<String, RunningGuest>()
 	private val consoles = ConcurrentHashMap<String, TerminalSession>()
 	private val logs = ConcurrentHashMap<String, MutableStateFlow<String>>()
+	private val networks = ConcurrentHashMap<String, GuestNetwork>()
+
+	/** The guest's internet, or null when it has none. */
+	fun network(id: String): GuestNetwork? = networks[id]
+
+	/** Turns a running guest's internet on or off, and remembers the choice. */
+	fun setInternet(
+		id: String,
+		on: Boolean,
+	) {
+		val vm = store.update(id) { it.copy(network = it.network.copy(internet = on)) }
+		networks.remove(id)?.stop()
+		val guest = guests[id]
+		if (on && guest is AgentGuest && vm.agent) networks[id] = GuestNetwork(vm.name, guest)
+		networkChanges.update { it + 1 }
+	}
+
+	private val networkChanges = MutableStateFlow(0)
+
+	/** Bumps when a guest's internet starts or stops, for screens to follow. */
+	val networkRevision: StateFlow<Int> = networkChanges.asStateFlow()
 
 	fun state(id: String): VmState = stateFlow.value[id] ?: VmState.Stopped
 
@@ -113,6 +136,10 @@ class Machines(
 				}
 				set(id, VmState.Running)
 				forwarder.startAll(id, vm.network.forwards, guest)
+				if (vm.network.internet && vm.agent && guest is AgentGuest) {
+					networks[id] = GuestNetwork(vm.name, guest)
+					networkChanges.update { it + 1 }
+				}
 			} catch (error: Throwable) {
 				Log.w(TAG, "Couldn't start ${vm.name}", error)
 				set(id, VmState.Failed(error.message ?: error.javaClass.simpleName))
@@ -122,6 +149,7 @@ class Machines(
 	}
 
 	private fun stopped(id: String, reason: String?) {
+		networks.remove(id)?.stop()
 		forwarder.stopAll(id)
 		guests.remove(id)
 		consoles.remove(id)?.close()

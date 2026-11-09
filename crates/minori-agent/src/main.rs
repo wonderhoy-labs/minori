@@ -8,9 +8,13 @@
 //! - `PORTS` → `OK [22,5900]`, the TCP ports something in the guest listens on
 //! - `CONNECT <port>` → `OK`, then the connection's bytes, or `ERR <reason>`
 //! - `UDP <port>` → `OK`, then datagrams both ways, each a big-endian u16 length and its bytes
+//! - `NET` → `OK`, then the guest's IP packets both ways, framed like `UDP`, through the TUN device `minori0`
 //! - `POWEROFF` → `OK`, then the guest shuts down
 //!
 //! It listens on vsock port 5741. `--tcp <address>` listens on TCP instead, for testing without vsock.
+
+#[cfg(target_os = "linux")]
+mod net;
 
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{Shutdown, TcpListener, TcpStream};
@@ -116,6 +120,16 @@ fn handle<R: Read + Send + 'static, W: Write + Send + 'static>(reader: R, mut wr
 			let ports = listening_ports();
 			let list: Vec<String> = ports.iter().map(u16::to_string).collect();
 			writeln!(writer, "OK [{}]", list.join(","))
+		}
+		("NET", _) => {
+			#[cfg(target_os = "linux")]
+			{
+				net::serve(reader, writer)
+			}
+			#[cfg(not(target_os = "linux"))]
+			{
+				writeln!(writer, "ERR the guest's internet needs Linux")
+			}
 		}
 		("POWEROFF", _) => {
 			writeln!(writer, "OK")?;
