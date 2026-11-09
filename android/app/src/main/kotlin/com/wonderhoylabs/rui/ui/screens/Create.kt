@@ -347,7 +347,11 @@ private fun SettingsForm(model: AppModel, source: Source, onBack: () -> Unit) {
 					Text(if (source == Source.Termux) "root's password" else "Password", style = MaterialTheme.typography.labelLarge)
 					CommandBox(password)
 					Text(
-						"Write it down or copy it now. Rui also keeps it on this phone so the Connect buttons can log in, and makes an SSH key for this machine.",
+						if (source == Source.Termux) {
+							"Write it down or copy it now. Rui also keeps it on this phone so its console can log in."
+						} else {
+							"Write it down or copy it now. Rui also keeps it on this phone so the Connect buttons can log in, and makes an SSH key for this machine."
+						},
 						style = MaterialTheme.typography.bodySmall,
 						color = MaterialTheme.colorScheme.onSurfaceVariant,
 					)
