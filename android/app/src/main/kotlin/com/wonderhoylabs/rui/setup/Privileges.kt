@@ -61,9 +61,13 @@ object Privileges {
 	const val MANAGE = "android.permission.MANAGE_VIRTUAL_MACHINE"
 	const val CUSTOM = "android.permission.USE_CUSTOM_VIRTUAL_MACHINE"
 	const val SHIZUKU_PACKAGE = "moe.shizuku.privileged.api"
+	private const val GRANT_WAIT_MS = 5000L
 
-	/** The two permissions AVF needs: one to run VMs at all, one to boot a kernel that isn't Microdroid. */
-	val PERMISSIONS = listOf(MANAGE, CUSTOM)
+	/**
+	 * The two permissions AVF needs: one to boot a kernel that isn't Microdroid, one to run VMs at all. Granting
+	 * MANAGE_VIRTUAL_MACHINE changes Rui's groups, so Android kills Rui then; it goes last.
+	 */
+	val PERMISSIONS = listOf(CUSTOM, MANAGE)
 
 	fun missingPermissions(context: Context): List<String> =
 		PERMISSIONS.filter { context.checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
@@ -72,6 +76,16 @@ object Privileges {
 	fun adbCommands(packageName: String): List<String> = PERMISSIONS.map { "adb shell pm grant $packageName $it" }
 
 	fun grantScript(packageName: String): String = PERMISSIONS.joinToString(" && ") { "pm grant $packageName $it" }
+
+	/**
+	 * The grant, detached from Rui, so it finishes after Android kills Rui for it, and then Rui's setup screen
+	 * opens again to show the result.
+	 */
+	fun detachedGrantScript(packageName: String): String =
+		"(sleep 1; ${grantScript(packageName)}; am start -n $packageName/.ui.MainActivity --ez $AFTER_GRANT true) " +
+			"</dev/null >/dev/null 2>&1 &"
+
+	const val AFTER_GRANT = "after_grant"
 
 	fun state(context: Context): PrivilegeState =
 		PrivilegeState(
@@ -100,8 +114,10 @@ object Privileges {
 	 */
 	fun grantWithShizuku(context: Context): String? {
 		val output =
-			runCatching { ShizukuShell.get(context).run(grantScript(context.packageName)) }
+			runCatching { ShizukuShell.get(context).run(detachedGrantScript(context.packageName)) }
 				.getOrElse { return "Shizuku couldn't run the grant: ${it.message}" }
+		// Android kills Rui when the grant lands, so usually this never returns. If it does, check.
+		Thread.sleep(GRANT_WAIT_MS)
 		val missing = missingPermissions(context)
 		if (missing.isEmpty()) return null
 		val printed = output.trim().lines().dropLast(1).joinToString("\n").trim()

@@ -92,7 +92,7 @@ object Catalog {
 			"chmod 600 /home/{user}/.config/tigervnc/passwd && chown -R {user}:{user} /home/{user}/.config && " +
 			"echo ':1={user}' >> /etc/tigervnc/vncserver.users && " +
 			"printf 'session={session}\\nlocalhost\\ngeometry=1600x900\\n' > /home/{user}/.config/tigervnc/config && " +
-			"chown {user}:{user} /home/{user}/.config/tigervnc/config && systemctl enable --now vncserver@:1"
+			"chown {user}:{user} /home/{user}/.config/tigervnc/config && systemctl enable --now tigervncserver@:1"
 
 	val templates: List<Template> =
 		listOf(

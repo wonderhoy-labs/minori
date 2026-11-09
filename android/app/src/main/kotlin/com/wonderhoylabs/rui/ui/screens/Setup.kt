@@ -125,7 +125,7 @@ fun SetupScreen(model: AppModel) {
 							context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://shizuku.rikka.app/")))
 						}) { Text("About Shizuku") }
 					}
-					ShizukuState.NotRunning -> Text("Shizuku is installed but not running. Open Shizuku and start it, then come back.")
+					ShizukuState.NotRunning -> Text("Shizuku is installed but Rui can't reach it. Start it in the Shizuku app. If it's already running, close Rui and open it again.")
 					ShizukuState.NeedsPermission ->
 						Button(onClick = {
 							grantRequested = true
@@ -136,13 +136,20 @@ fun SetupScreen(model: AppModel) {
 							Text(if (working) "Granting…" else "Grant with Shizuku")
 						}
 				}
+				if (state.shizuku == ShizukuState.Ready || state.shizuku == ShizukuState.NeedsPermission) {
+					Text(
+						"Android closes Rui for a moment while it applies the permissions, then Rui opens here again.",
+						style = MaterialTheme.typography.bodySmall,
+						color = MaterialTheme.colorScheme.onSurfaceVariant,
+					)
+				}
 				result?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 			}
 			Section(title = "With a computer") {
 				Text("Turn on USB debugging, connect the phone, and run these on the computer:")
 				for (command in Privileges.adbCommands(context.packageName)) CommandBox(command)
 				Text(
-					"Rui checks again by itself when you come back.",
+					"Android closes Rui when the second one is granted. Open Rui again afterwards and it checks by itself.",
 					style = MaterialTheme.typography.bodySmall,
 					color = MaterialTheme.colorScheme.onSurfaceVariant,
 				)

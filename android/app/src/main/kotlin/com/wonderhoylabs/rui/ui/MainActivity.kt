@@ -124,6 +124,7 @@ class MainActivity : ComponentActivity() {
 		if (savedInstanceState == null && privileges.avfFeature && !privileges.granted && app.vms.vms.value.isEmpty()) {
 			model.go(Screen.Setup)
 		}
+		if (intent?.getBooleanExtra(Privileges.AFTER_GRANT, false) == true && model.current != Screen.Setup) model.go(Screen.Setup)
 		handleDevExtras(intent)
 		setContent {
 			RuiTheme {
@@ -136,6 +137,7 @@ class MainActivity : ComponentActivity() {
 
 	override fun onNewIntent(intent: Intent) {
 		super.onNewIntent(intent)
+		if (intent.getBooleanExtra(Privileges.AFTER_GRANT, false) && model.current != Screen.Setup) model.go(Screen.Setup)
 		handleDevExtras(intent)
 	}
 
