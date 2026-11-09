@@ -1,5 +1,5 @@
 {
-	"name": "template",
+	"name": "rui",
 	"private": true,
 	"type": "module",
 	"license": "Apache-2.0",
@@ -8,11 +8,11 @@
 		"node": ">=24"
 	},
 	"wonderhoy": {
-		"name": "Template",
-		"tagline": "The starting point for a new Wonderhoy Labs project.",
-		"character": "Hatsune Miku",
-		"unit": "VIRTUAL SINGER",
-		"color": "#33CCBB"
+		"name": "Rui",
+		"tagline": "Your Pixel's hypervisor.",
+		"character": "Kamishiro Rui",
+		"unit": "Wonderlands×Showtime",
+		"color": "#BB88EE"
 	},
 	"scripts": {
 		"lint": "biome ci",

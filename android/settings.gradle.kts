@@ -14,5 +14,5 @@ dependencyResolutionManagement {
 	}
 }
 
-rootProject.name = "template"
+rootProject.name = "rui"
 include(":app")

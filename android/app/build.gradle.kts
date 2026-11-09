@@ -11,11 +11,11 @@ val appVersionCode =
 	}
 
 android {
-	namespace = "com.wonderhoylabs.template"
+	namespace = "com.wonderhoylabs.rui"
 	compileSdk = 37
 
 	defaultConfig {
-		applicationId = "com.wonderhoylabs.template"
+		applicationId = "com.wonderhoylabs.rui"
 		minSdk = 29
 		targetSdk = 37
 		versionCode = appVersionCode
@@ -25,12 +25,12 @@ android {
 	// Set these to sign with your own key. Without them a release APK still installs, because it
 	// falls back to the debug key, but Android refuses to update an app across different keys.
 	signingConfigs {
-		System.getenv("TEMPLATE_KEYSTORE")?.let { keystore ->
+		System.getenv("RUI_KEYSTORE")?.let { keystore ->
 			create("release") {
 				storeFile = file(keystore)
-				storePassword = System.getenv("TEMPLATE_KEYSTORE_PASSWORD")
-				keyAlias = System.getenv("TEMPLATE_KEY_ALIAS")
-				keyPassword = System.getenv("TEMPLATE_KEY_PASSWORD")
+				storePassword = System.getenv("RUI_KEYSTORE_PASSWORD")
+				keyAlias = System.getenv("RUI_KEY_ALIAS")
+				keyPassword = System.getenv("RUI_KEY_PASSWORD")
 			}
 		}
 	}
