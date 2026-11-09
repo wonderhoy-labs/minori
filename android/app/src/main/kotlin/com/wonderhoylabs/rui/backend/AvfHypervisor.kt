@@ -63,10 +63,12 @@ class AvfHypervisor(private val context: Context) : Hypervisor {
 		val boot = vm.boot ?: throw IOException("${vm.name} has no kernel to boot. Pick a bootable image for it.")
 		val kernel = File(dir, boot.kernelFile)
 		if (!kernel.exists()) throw IOException("${vm.name}'s kernel is missing. Edit the VM and choose its boot disk again.")
+		// AVF only takes letters, digits, - and _ in a name, so it gets the instance name, not the user's.
+		val name = "rui-${vm.id}"
 		val image =
 			VirtualMachineCustomImageConfig
 				.Builder()
-				.setName(vm.name)
+				.setName(name)
 				.setKernelPath(kernel.path)
 				.apply { boot.initrdFile?.let { File(dir, it) }?.takeIf { it.exists() }?.let { setInitrdPath(it.path) } }
 				.apply { boot.cmdline.split(' ').filter { it.isNotBlank() }.forEach { addParam(it) } }
@@ -115,7 +117,6 @@ class AvfHypervisor(private val context: Context) : Hypervisor {
 				.setConsoleInputDevice(boot.consoleDevice)
 				.build()
 		val manager = manager()
-		val name = "rui-${vm.id}"
 		// The instance holds nothing for an unprotected custom VM, so it's made fresh each start with the current settings.
 		runCatching { manager.delete(name) }
 		val machine = manager.create(name, config)
