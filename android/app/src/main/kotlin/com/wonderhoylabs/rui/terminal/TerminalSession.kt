@@ -42,6 +42,14 @@ open class TerminalSession(
 	// Keys and resizes go out one at a time, in order, and never on the main thread: SSH writes to the network.
 	private val sender = Executors.newSingleThreadExecutor { Thread(it, "terminal-send").apply { isDaemon = true } }
 
+	private val taps = java.util.concurrent.CopyOnWriteArrayList<(ByteArray) -> Unit>()
+
+	/** Also sends everything the other end prints to [listener], until the returned handle is closed. */
+	fun tap(listener: (ByteArray) -> Unit): AutoCloseable {
+		taps.add(listener)
+		return AutoCloseable { taps.remove(listener) }
+	}
+
 	val canType: Boolean get() = input != null
 
 	private val reader =
@@ -52,6 +60,10 @@ open class TerminalSession(
 					val n = output.read(buffer)
 					if (n < 0) break
 					emulator.feed(buffer, 0, n)
+					if (taps.isNotEmpty()) {
+						val copy = buffer.copyOf(n)
+						taps.forEach { it(copy) }
+					}
 					revisions.value = emulator.revision
 				}
 				ended.value = "Disconnected"

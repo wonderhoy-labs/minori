@@ -111,6 +111,7 @@ class MainActivity : ComponentActivity() {
 		) {
 			model.go(Screen.Setup)
 		}
+		handleLink(intent)
 		handleDevExtras(intent)
 		setContent {
 			RuiTheme {
@@ -124,7 +125,26 @@ class MainActivity : ComponentActivity() {
 	override fun onNewIntent(intent: Intent) {
 		super.onNewIntent(intent)
 		if (intent.getBooleanExtra(Privileges.AFTER_GRANT, false) && model.current != Screen.Setup) model.go(Screen.Setup)
+		handleLink(intent)
 		handleDevExtras(intent)
+	}
+
+	/**
+	 * Opens `rui://vm/<id or name>`, and `/console`, `/ssh` or `/vnc` after it, for other apps and for Asahi
+	 * through `am start`. The machine has to be running for the last three; nothing is started for the caller.
+	 */
+	private fun handleLink(intent: Intent?) {
+		val uri = intent?.data ?: return
+		if (uri.scheme != "rui" || uri.host != "vm") return
+		val key = uri.pathSegments.getOrNull(0) ?: return
+		val app = RuiApp.get(this)
+		val vm = app.vms.get(key) ?: app.vms.vms.value.firstOrNull { it.name == key } ?: return
+		model.go(Screen.Detail(vm.id))
+		when (uri.pathSegments.getOrNull(1)) {
+			"console" -> model.go(Screen.Console(vm.id))
+			"ssh" -> model.go(Screen.Ssh(vm.id))
+			"vnc" -> model.go(Screen.Vnc(vm.id, vm.access.vncPort))
+		}
 	}
 
 	/**

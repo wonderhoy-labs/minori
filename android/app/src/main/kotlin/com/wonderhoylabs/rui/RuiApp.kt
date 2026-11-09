@@ -9,6 +9,7 @@ import com.wonderhoylabs.rui.backend.Hypervisor
 import com.wonderhoylabs.rui.backend.TermuxHypervisor
 import com.wonderhoylabs.rui.model.BackendKind
 import com.wonderhoylabs.rui.net.PortForwarder
+import com.wonderhoylabs.rui.service.Helper
 import com.wonderhoylabs.rui.service.Machines
 import com.wonderhoylabs.rui.service.Operations
 import com.wonderhoylabs.rui.setup.HiddenApi
@@ -52,6 +53,7 @@ class RuiApp : Application() {
 		if (BuildConfig.DEBUG) backends[BackendKind.DEMO] = DemoHypervisor { demoTarget }
 		machines = Machines(this, vms, PortForwarder(), backends)
 		operations = Operations(this, vms, images)
+		Helper(this).start()
 	}
 
 	companion object {

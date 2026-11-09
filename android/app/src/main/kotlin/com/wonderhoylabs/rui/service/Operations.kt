@@ -431,9 +431,8 @@ class Operations(private val context: Context, private val vms: VmStore, private
 }
 
 /** A size for people: GiB from 1 GiB, MiB from 1 MiB, KiB below that. */
-fun Long.gib(): String =
-	when {
-		this >= Operations.GIB -> "%.1f GiB".format(this.toDouble() / Operations.GIB)
-		this >= 1024 * 1024 -> "%d MiB".format(this / (1024 * 1024))
-		else -> "%d KiB".format(this / 1024)
-	}
+fun Long.gib(): String = when {
+	this >= Operations.GIB -> "%.1f GiB".format(this.toDouble() / Operations.GIB)
+	this >= 1024 * 1024 -> "%d MiB".format(this / (1024 * 1024))
+	else -> "%d KiB".format(this / 1024)
+}

@@ -55,6 +55,14 @@
 				<action android:name="android.intent.action.MAIN" />
 				<category android:name="android.intent.category.LAUNCHER" />
 			</intent-filter>
+			<!-- rui://vm/<id>[/console|ssh|vnc] opens a machine's page or one of its screens. It never starts anything. -->
+			<intent-filter>
+				<action android:name="android.intent.action.VIEW" />
+				<category android:name="android.intent.category.DEFAULT" />
+				<data
+					android:host="vm"
+					android:scheme="rui" />
+			</intent-filter>
 		</activity>
 
 		<service
