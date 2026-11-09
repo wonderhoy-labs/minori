@@ -366,7 +366,8 @@ class TerminalEmulator(
 					0 -> tabStops[cursorCol] = false
 					3 -> tabStops.fill(false)
 				}
-			't' -> {}
+			// The text area's size, which a serial console's guest asks for because nothing else tells it.
+			't' -> if (arg(0, 0) == 18) reply("\u001b[8;$rows;${columns}t")
 			else -> {}
 		}
 	}

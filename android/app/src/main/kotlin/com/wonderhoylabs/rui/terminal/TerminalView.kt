@@ -163,6 +163,8 @@ fun TerminalView(
 					.onSizeChanged { size ->
 						val cols = (size.width / cell.width).coerceAtLeast(10)
 						val rows = (size.height / cell.height).coerceAtLeast(4)
+						TerminalSize.rows = rows
+						TerminalSize.cols = cols
 						session.resize(rows, cols)
 					}.pointerInput(Unit) {
 						detectTapGestures(onTap = {
@@ -280,5 +282,26 @@ fun TerminalEnded(
 				.background(MaterialTheme.colorScheme.errorContainer)
 				.clickable(onClick = onClick)
 				.padding(12.dp),
+	)
+}
+
+/** Measures the space a terminal will have, so a session can start at the right size. */
+@Composable
+fun TerminalMeasure(
+	modifier: Modifier = Modifier,
+	fontSize: Int = 13,
+	onMeasured: () -> Unit,
+) {
+	val measurer = rememberTextMeasurer()
+	val style = TextStyle(fontFamily = FontFamily.Monospace, fontSize = fontSize.sp)
+	val cell = remember(fontSize) { measurer.measure("M", style).size }
+	Box(
+		modifier =
+			modifier.padding(4.dp).onSizeChanged { size ->
+				TerminalSize.cols = (size.width / cell.width).coerceAtLeast(10)
+				// The row of extra keys takes about two text rows.
+				TerminalSize.rows = (size.height / cell.height - 2).coerceAtLeast(4)
+				onMeasured()
+			},
 	)
 }

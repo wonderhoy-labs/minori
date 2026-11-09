@@ -99,7 +99,8 @@ class PortForwarder {
 		guest: RunningGuest,
 		temporary: Boolean,
 	): Int {
-		val bind = if (forward.exposure == Exposure.LOOPBACK) InetAddress.getLoopbackAddress() else InetAddress.getByName("::")
+		// 127.0.0.1, not getLoopbackAddress(), which is ::1 on Android: the page and other apps say 127.0.0.1.
+		val bind = if (forward.exposure == Exposure.LOOPBACK) InetAddress.getByName("127.0.0.1") else InetAddress.getByName("::")
 		return try {
 			when (forward.protocol) {
 				Protocol.TCP -> startTcp(vmId, forward, guest, bind, temporary)
@@ -139,7 +140,9 @@ class PortForwarder {
 		thread(name = "forward-${published.hostPort}", isDaemon = true) {
 			while (!server.isClosed) {
 				val client = runCatching { server.accept() }.getOrNull() ?: break
-				if (!Firewall.allows(published, client.inetAddress)) {
+				val allowed = Firewall.allows(published, client.inetAddress)
+				Log.i(TAG, "Port ${published.hostPort}: ${client.inetAddress.hostAddress} ${if (allowed) "allowed" else "refused"}")
+				if (!allowed) {
 					runCatching { client.close() }
 					count(forward.id) { it.copy(refused = it.refused + 1) }
 					continue

@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import com.wonderhoylabs.rui.RuiApp
 import com.wonderhoylabs.rui.terminal.Ssh
 import com.wonderhoylabs.rui.terminal.TerminalEnded
+import com.wonderhoylabs.rui.terminal.TerminalMeasure
 import com.wonderhoylabs.rui.terminal.TerminalSession
 import com.wonderhoylabs.rui.terminal.TerminalView
 import com.wonderhoylabs.rui.ui.AppModel
@@ -53,6 +54,7 @@ private fun TerminalFrame(
 	model: AppModel,
 	session: TerminalSession?,
 	status: String?,
+	onMeasured: () -> Unit = {},
 ) {
 	@Suppress("DEPRECATION")
 	val clipboard = LocalClipboardManager.current
@@ -76,6 +78,7 @@ private fun TerminalFrame(
 			}
 			else ->
 				Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+					TerminalMeasure(modifier = Modifier.fillMaxSize(), onMeasured = onMeasured)
 					Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
 						if (status == null) CircularProgressIndicator()
 						Text(status ?: "Connecting", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(24.dp))
@@ -113,7 +116,9 @@ fun SshScreen(
 	var session by remember { mutableStateOf<TerminalSession?>(null) }
 	var status by remember { mutableStateOf<String?>(null) }
 	var hostKey by remember { mutableStateOf<Pair<String, CompletableDeferred<Boolean>>?>(null) }
-	LaunchedEffect(vmId) {
+	var measured by remember { mutableStateOf(false) }
+	LaunchedEffect(vmId, measured) {
+		if (!measured) return@LaunchedEffect
 		val guest = app.machines.guest(vmId)
 		if (guest == null) {
 			status = "The machine isn't running."
@@ -142,7 +147,7 @@ fun SshScreen(
 			}
 	}
 	DisposableEffect(vmId) { onDispose { session?.close() } }
-	TerminalFrame(title = "${vm.name} over SSH", model = model, session = session, status = status)
+	TerminalFrame(title = "${vm.name} over SSH", model = model, session = session, status = status, onMeasured = { measured = true })
 	hostKey?.let { (message, answer) ->
 		AlertDialog(
 			onDismissRequest = { answer.complete(false) },

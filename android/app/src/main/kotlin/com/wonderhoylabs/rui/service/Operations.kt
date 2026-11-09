@@ -248,6 +248,12 @@ class Operations(
 			run += "systemctl daemon-reload"
 			run += "systemctl enable --now rui-agent.service"
 		}
+		files +=
+			buildJsonObject {
+				put("path", "/etc/profile.d/rui-console-size.sh")
+				put("permissions", "0644")
+				put("content", context.assets.open(CONSOLE_SIZE_ASSET).use { it.readBytes().toString(Charsets.UTF_8) })
+			}
 		run += firstBoot.extraRun
 		return buildJsonObject {
 			put("hostname", firstBoot.hostname)
@@ -406,6 +412,7 @@ class Operations(
 		const val GIB = 1024L * 1024 * 1024
 		private const val SPARE = 256L * 1024 * 1024
 		const val AGENT_ASSET = "rui-agent-aarch64"
+		const val CONSOLE_SIZE_ASSET = "rui-console-size.sh"
 		const val AGENT_UNIT =
 			"[Unit]\nDescription=Rui guest agent\nAfter=network.target\n\n[Service]\nExecStart=/usr/local/bin/rui-agent\n" +
 				"Restart=always\nRestartSec=2\n\n[Install]\nWantedBy=multi-user.target\n"

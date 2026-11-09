@@ -43,8 +43,12 @@ class AddressRange private constructor(
 			address.isNotEmpty() && address.all { it.isDigit() || it == '.' || it == ':' || it in 'a'..'f' || it in 'A'..'F' } &&
 				(address.contains('.') || address.contains(':'))
 
-		/** IPv4-mapped IPv6 addresses are compared as IPv4, so `::ffff:10.0.0.1` matches `10.0.0.0/8`. */
+		/**
+		 * IPv4-mapped IPv6 addresses are compared as IPv4, so `::ffff:10.0.0.1` matches `10.0.0.0/8`, and IPv6
+		 * loopback as 127.0.0.1, so a rule about this phone covers both.
+		 */
 		private fun normalise(bytes: ByteArray): ByteArray {
+			if (bytes.size == 16 && bytes.take(15).all { it.toInt() == 0 } && bytes[15].toInt() == 1) return byteArrayOf(127, 0, 0, 1)
 			if (bytes.size == 16 && bytes.take(10).all { it.toInt() == 0 } && bytes[10].toInt() == -1 && bytes[11].toInt() == -1) {
 				return bytes.copyOfRange(12, 16)
 			}

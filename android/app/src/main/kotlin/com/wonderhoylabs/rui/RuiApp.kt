@@ -27,8 +27,15 @@ class RuiApp : Application() {
 	lateinit var operations: Operations
 		private set
 
-	/** Debug builds: where the demo backend's console and agent point, set by test intents. */
-	@Volatile var demoTarget = DemoTarget()
+	/** Debug builds: where the demo backend's console and agent point, set by test intents and kept until changed. */
+	var demoTarget: DemoTarget
+		get() {
+			val prefs = getSharedPreferences("dev", MODE_PRIVATE)
+			return DemoTarget(console = prefs.getString("console", null), agent = prefs.getString("agent", null))
+		}
+		set(value) {
+			getSharedPreferences("dev", MODE_PRIVATE).edit().putString("console", value.console).putString("agent", value.agent).apply()
+		}
 
 	val storageRoot: File get() = filesDir
 

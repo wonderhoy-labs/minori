@@ -53,8 +53,8 @@ object Ssh {
 		knownHosts: File,
 		open: () -> GuestConnection,
 		confirmHostKey: (message: String) -> Boolean,
-		rows: Int = 24,
-		cols: Int = 80,
+		rows: Int = TerminalSize.rows,
+		cols: Int = TerminalSize.cols,
 	): ShellChannel {
 		knownHosts.parentFile?.mkdirs()
 		if (!knownHosts.exists()) knownHosts.createNewFile()

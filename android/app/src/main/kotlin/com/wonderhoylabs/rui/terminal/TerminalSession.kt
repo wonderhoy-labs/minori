@@ -3,9 +3,18 @@ package com.wonderhoylabs.rui.terminal
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import android.util.Log
 import java.io.InputStream
 import java.io.OutputStream
+import java.util.concurrent.Executors
 import kotlin.concurrent.thread
+
+/** The size the terminal view last measured, so a new session starts at it instead of 80 by 24. */
+object TerminalSize {
+	@Volatile var rows = 24
+
+	@Volatile var cols = 80
+}
 
 /**
  * A terminal attached to something: a VM's console, an SSH shell, a local shell. It reads output into its
@@ -28,7 +37,10 @@ open class TerminalSession(
 	/** Null while attached; a reason once the other end has gone. */
 	val endReason: StateFlow<String?> = ended.asStateFlow()
 
-	val emulator = TerminalEmulator(respond = { write(it) })
+	val emulator = TerminalEmulator(TerminalSize.cols, TerminalSize.rows, respond = { write(it) })
+
+	// Keys and resizes go out one at a time, in order, and never on the main thread: SSH writes to the network.
+	private val sender = Executors.newSingleThreadExecutor { Thread(it, "terminal-send").apply { isDaemon = true } }
 
 	val canType: Boolean get() = input != null
 
@@ -44,6 +56,7 @@ open class TerminalSession(
 				}
 				ended.value = "Disconnected"
 			} catch (error: Exception) {
+				Log.i("RuiTerminal", "$title ended", error)
 				ended.value = error.message ?: "Disconnected"
 			}
 			revisions.value = emulator.revision + 1
@@ -51,9 +64,9 @@ open class TerminalSession(
 
 	fun write(bytes: ByteArray) {
 		val target = input ?: return
-		thread(name = "terminal-write", isDaemon = true) {
-			runCatching {
-				synchronized(target) {
+		runCatching {
+			sender.execute {
+				runCatching {
 					target.write(bytes)
 					target.flush()
 				}
@@ -76,10 +89,11 @@ open class TerminalSession(
 		if (rows == emulator.rows && cols == emulator.columns) return
 		emulator.resize(cols, rows)
 		revisions.value = emulator.revision
-		runCatching { onResize(rows, cols) }
+		runCatching { sender.execute { runCatching { onResize(rows, cols) } } }
 	}
 
 	open fun close() {
+		sender.shutdown()
 		runCatching { onClose() }
 		runCatching { input?.close() }
 		runCatching { output.close() }
