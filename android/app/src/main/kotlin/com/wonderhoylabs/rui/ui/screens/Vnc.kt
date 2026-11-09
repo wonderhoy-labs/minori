@@ -60,11 +60,7 @@ import kotlin.concurrent.thread
 /** The guest's desktop over VNC, through Rui's own connection to it. Tap to click, drag to move, long-press to right-click. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun VncScreen(
-	model: com.wonderhoylabs.rui.ui.AppModel,
-	vmId: String,
-	guestPort: Int,
-) {
+fun VncScreen(model: com.wonderhoylabs.rui.ui.AppModel, vmId: String, guestPort: Int) {
 	val app = RuiApp.get(LocalContext.current)
 	val vm = app.vms.get(vmId) ?: return
 	var client by remember { mutableStateOf<RfbClient?>(null) }
@@ -93,7 +89,9 @@ fun VncScreen(
 		val keyboard = LocalSoftwareKeyboardController.current
 		TopAppBar(
 			title = { Text("${vm.name} desktop") },
-			navigationIcon = { IconButton(onClick = { model.back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
+			navigationIcon = {
+				IconButton(onClick = { model.back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+			},
 			actions = {
 				IconButton(onClick = {
 					focus.requestFocus()
@@ -155,13 +153,21 @@ fun VncScreen(
 		) {
 			@Suppress("UNUSED_EXPRESSION")
 			frame
-			rfb.bitmap?.let { Image(it.asImageBitmap(), contentDescription = "Guest desktop", contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize()) }
+			rfb.bitmap?.let {
+				Image(
+					it.asImageBitmap(),
+					contentDescription = "Guest desktop",
+					contentScale = ContentScale.Fit,
+					modifier = Modifier.fillMaxSize(),
+				)
+			}
 			var field by remember { mutableStateOf(TextFieldValue("  ", TextRange(2))) }
 			BasicTextField(
 				value = field,
 				onValueChange = { next ->
 					when {
 						next.text.length > field.text.length -> rfb.type(next.text.substring(field.text.length))
+
 						next.text.length < field.text.length -> repeat(field.text.length - next.text.length) {
 							rfb.key(RfbClient.KEY_BACKSPACE, true)
 							rfb.key(RfbClient.KEY_BACKSPACE, false)
@@ -172,8 +178,19 @@ fun VncScreen(
 				modifier = Modifier.size(1.dp).focusRequester(focus),
 			)
 		}
-		Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-			for ((label, keysym) in listOf("Esc" to RfbClient.KEY_ESCAPE, "Tab" to RfbClient.KEY_TAB, "←" to RfbClient.KEY_LEFT, "↑" to RfbClient.KEY_UP, "↓" to RfbClient.KEY_DOWN, "→" to RfbClient.KEY_RIGHT, "Enter" to RfbClient.KEY_RETURN)) {
+		Row(
+			Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(4.dp),
+			horizontalArrangement = Arrangement.spacedBy(4.dp),
+		) {
+			for ((label, keysym) in listOf(
+				"Esc" to RfbClient.KEY_ESCAPE,
+				"Tab" to RfbClient.KEY_TAB,
+				"←" to RfbClient.KEY_LEFT,
+				"↑" to RfbClient.KEY_UP,
+				"↓" to RfbClient.KEY_DOWN,
+				"→" to RfbClient.KEY_RIGHT,
+				"Enter" to RfbClient.KEY_RETURN,
+			)) {
 				FilterChip(selected = false, onClick = {
 					rfb.key(keysym, true)
 					rfb.key(keysym, false)

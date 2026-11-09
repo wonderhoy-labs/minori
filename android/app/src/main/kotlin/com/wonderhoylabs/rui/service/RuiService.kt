@@ -21,11 +21,7 @@ import com.wonderhoylabs.rui.ui.MainActivity
 class RuiService : Service() {
 	override fun onBind(intent: Intent?): IBinder? = null
 
-	override fun onStartCommand(
-		intent: Intent?,
-		flags: Int,
-		startId: Int,
-	): Int {
+	override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
 		val machines = RuiApp.get(this).machines
 		if (intent?.action == ACTION_STOP_ALL) {
 			machines.stopAll()

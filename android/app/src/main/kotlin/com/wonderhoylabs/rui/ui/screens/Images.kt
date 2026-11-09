@@ -38,14 +38,21 @@ fun ImagesScreen(model: AppModel) {
 		}
 	SubScreen(title = "Images", model = model) {
 		Text(
-			"Disk images (raw, .img, qcow2) and ISOs for 64-bit Arm. Rui checks what's inside before you use one. ${freeBytes(app.images.dir).gib()} free.",
+			"Disk images (raw, .img, qcow2) and ISOs for 64-bit Arm. Rui checks what's inside before you use one. ${freeBytes(
+				app.images.dir,
+			).gib()} free.",
 			style = MaterialTheme.typography.bodyMedium,
 		)
 		Button(onClick = { picker.launch(arrayOf("*/*")) }) { Text("Import a file") }
 		for (image in images) {
 			ImageCard(image, onClick = null)
 			Text(
-				listOfNotNull(image.source, image.sha256.takeIf { it.isNotEmpty() }?.let { "SHA-256 ${it.take(16)}…" }).joinToString(" · "),
+				listOfNotNull(
+					image.source,
+					image.sha256.takeIf {
+						it.isNotEmpty()
+					}?.let { "SHA-256 ${it.take(16)}…" },
+				).joinToString(" · "),
 				style = MaterialTheme.typography.bodySmall,
 				color = MaterialTheme.colorScheme.onSurfaceVariant,
 			)

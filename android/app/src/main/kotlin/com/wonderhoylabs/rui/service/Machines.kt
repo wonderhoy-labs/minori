@@ -46,7 +46,8 @@ class Machines(
 
 	fun backend(kind: BackendKind): Hypervisor? = backends[kind]
 
-	fun availability(kind: BackendKind): Availability = backends[kind]?.availability() ?: Availability.Unavailable("This backend isn't part of this build.")
+	fun availability(kind: BackendKind): Availability =
+		backends[kind]?.availability() ?: Availability.Unavailable("This backend isn't part of this build.")
 
 	fun guest(id: String): RunningGuest? = guests[id]
 
@@ -54,15 +55,9 @@ class Machines(
 
 	fun log(id: String): StateFlow<String> = logs.getOrPut(id) { MutableStateFlow("") }
 
-	private fun set(
-		id: String,
-		state: VmState,
-	) = stateFlow.update { it + (id to state) }
+	private fun set(id: String, state: VmState) = stateFlow.update { it + (id to state) }
 
-	private fun appendLog(
-		id: String,
-		text: String,
-	) {
+	private fun appendLog(id: String, text: String) {
 		val flow = logs.getOrPut(id) { MutableStateFlow("") }
 		flow.update { (it + text).takeLast(MAX_LOG) }
 	}
@@ -126,10 +121,7 @@ class Machines(
 		}
 	}
 
-	private fun stopped(
-		id: String,
-		reason: String?,
-	) {
+	private fun stopped(id: String, reason: String?) {
 		forwarder.stopAll(id)
 		guests.remove(id)
 		consoles.remove(id)?.close()
@@ -165,7 +157,10 @@ class Machines(
 		}
 	}
 
-	fun runningCount(): Int = stateFlow.value.values.count { it == VmState.Running || it == VmState.Starting || it == VmState.Stopping }
+	fun runningCount(): Int = stateFlow.value.values.count {
+		it == VmState.Running || it == VmState.Starting ||
+			it == VmState.Stopping
+	}
 
 	/** After the user edits a running VM's ports, publishes the new set. */
 	fun refreshForwards(id: String) {

@@ -62,10 +62,7 @@ data class VmDisk(
 )
 
 @Serializable
-data class BootSource(
-	val kind: String,
-	val number: Int? = null,
-)
+data class BootSource(val kind: String, val number: Int? = null)
 
 /** What rui-core's inspect found to boot. Mirrors `rui_core::inspect::BootPlan`. */
 @Serializable
@@ -180,7 +177,5 @@ sealed interface VmState {
 
 	data object Stopping : VmState
 
-	data class Failed(
-		val message: String,
-	) : VmState
+	data class Failed(val message: String) : VmState
 }

@@ -46,7 +46,12 @@ fun SettingsScreen(model: AppModel) {
 		Section(title = "Hypervisor") {
 			Fact("Virtualization Framework", if (privileges.avfFeature) "Present" else "Not on this device")
 			Fact("Permissions", if (privileges.granted) "Granted" else "${privileges.missing.size} missing")
-			Fact("Shizuku", privileges.shizuku.name.replace(Regex("([a-z])([A-Z])"), "$1 $2").lowercase().replaceFirstChar { it.uppercase() })
+			Fact(
+				"Shizuku",
+				privileges.shizuku.name.replace(Regex("([a-z])([A-Z])"), "$1 $2").lowercase().replaceFirstChar {
+					it.uppercase()
+				},
+			)
 			FilledTonalButton(onClick = { model.go(Screen.Setup) }) { Text("Open setup") }
 		}
 		Section(title = "Backends") {
@@ -64,13 +69,20 @@ fun SettingsScreen(model: AppModel) {
 					Text(it.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 				}
 			}
-			if (context.checkSelfPermission(TermuxHypervisor.RUN_COMMAND_PERMISSION) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-				OutlinedButton(onClick = { termuxPermission.launch(TermuxHypervisor.RUN_COMMAND_PERMISSION) }) { Text("Allow Rui to use Termux") }
+			if (context.checkSelfPermission(TermuxHypervisor.RUN_COMMAND_PERMISSION) !=
+				android.content.pm.PackageManager.PERMISSION_GRANTED
+			) {
+				OutlinedButton(onClick = {
+					termuxPermission.launch(TermuxHypervisor.RUN_COMMAND_PERMISSION)
+				}) { Text("Allow Rui to use Termux") }
 			}
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-				context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
+				context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
+				android.content.pm.PackageManager.PERMISSION_GRANTED
 			) {
-				OutlinedButton(onClick = { notifications.launch(Manifest.permission.POST_NOTIFICATIONS) }) { Text("Show a notification while machines run") }
+				OutlinedButton(onClick = {
+					notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+				}) { Text("Show a notification while machines run") }
 			}
 		}
 		Section(title = "Storage") {
@@ -84,8 +96,13 @@ fun SettingsScreen(model: AppModel) {
 		}
 		Section(title = "About") {
 			Fact("Version", BuildConfig.VERSION_NAME)
-			Text("Early software. AVF VMs haven't been run on a phone yet; see the README for exactly what has been tested.", style = MaterialTheme.typography.bodySmall)
-			OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(Brand.REPOSITORY))) }) { Text("Source and README") }
+			Text(
+				"Early software. AVF VMs haven't been run on a phone yet; see the README for exactly what has been tested.",
+				style = MaterialTheme.typography.bodySmall,
+			)
+			OutlinedButton(onClick = {
+				context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(Brand.REPOSITORY)))
+			}) { Text("Source and README") }
 		}
 		BrandFooter()
 	}

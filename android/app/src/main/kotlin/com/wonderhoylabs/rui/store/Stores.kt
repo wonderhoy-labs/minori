@@ -22,10 +22,7 @@ fun File.writeAtomically(text: String) {
 }
 
 /** How much a file really takes on disk and how big it says it is. */
-data class DiskUsage(
-	val used: Long,
-	val allocated: Long,
-)
+data class DiskUsage(val used: Long, val allocated: Long)
 
 fun File.usage(): DiskUsage {
 	if (!exists()) return DiskUsage(0, 0)
@@ -33,19 +30,16 @@ fun File.usage(): DiskUsage {
 	return DiskUsage(used = used, allocated = length())
 }
 
-fun freeBytes(dir: File): Long =
-	runCatching {
-		dir.mkdirs()
-		StatFs(dir.path).availableBytes
-	}.getOrDefault(0L)
+fun freeBytes(dir: File): Long = runCatching {
+	dir.mkdirs()
+	StatFs(dir.path).availableBytes
+}.getOrDefault(0L)
 
 /**
  * The machines, one folder each under `vms/`: `config.json`, the disks, `boot/` with the extracted kernel, and
  * `logs/`. The list is a [StateFlow] so every screen follows changes.
  */
-class VmStore(
-	private val root: File,
-) {
+class VmStore(private val root: File) {
 	private val state = MutableStateFlow<List<VmConfig>>(emptyList())
 	val vms: StateFlow<List<VmConfig>> = state.asStateFlow()
 
@@ -74,10 +68,7 @@ class VmStore(
 		state.value = (state.value.filterNot { it.id == vm.id } + vm).sortedBy { it.createdAt }
 	}
 
-	fun update(
-		id: String,
-		change: (VmConfig) -> VmConfig,
-	): VmConfig {
+	fun update(id: String, change: (VmConfig) -> VmConfig): VmConfig {
 		val current = get(id) ?: throw IOException("That machine no longer exists")
 		val next = change(current)
 		save(next)
@@ -86,11 +77,7 @@ class VmStore(
 
 	/** Deletes a machine. With [keepDisks], its disks move to [images] first, so nothing the user made is lost. */
 	@Synchronized
-	fun delete(
-		id: String,
-		keepDisks: Boolean,
-		images: ImageStore,
-	) {
+	fun delete(id: String, keepDisks: Boolean, images: ImageStore) {
 		val vm = get(id) ?: return
 		if (keepDisks) {
 			for (disk in vm.disks) {
@@ -104,15 +91,11 @@ class VmStore(
 		state.value = state.value.filterNot { it.id == id }
 	}
 
-	fun diskFile(
-		vm: VmConfig,
-		file: String,
-	): File = File(dir(vm.id), file)
+	fun diskFile(vm: VmConfig, file: String): File = File(dir(vm.id), file)
 
-	fun usage(vm: VmConfig): DiskUsage =
-		vm.disks
-			.map { diskFile(vm, it.file).usage() }
-			.fold(DiskUsage(0, 0)) { total, disk -> DiskUsage(total.used + disk.used, total.allocated + disk.allocated) }
+	fun usage(vm: VmConfig): DiskUsage = vm.disks
+		.map { diskFile(vm, it.file).usage() }
+		.fold(DiskUsage(0, 0)) { total, disk -> DiskUsage(total.used + disk.used, total.allocated + disk.allocated) }
 
 	companion object {
 		const val CONFIG = "config.json"
@@ -120,9 +103,7 @@ class VmStore(
 }
 
 /** Images the user brought in or downloaded, one folder each under `images/`, with `image.json` beside the file. */
-class ImageStore(
-	private val root: File,
-) {
+class ImageStore(private val root: File) {
 	private val state = MutableStateFlow<List<ImageRecord>>(emptyList())
 	val images: StateFlow<List<ImageRecord>> = state.asStateFlow()
 
@@ -166,10 +147,7 @@ class ImageStore(
 	fun newFolder(id: String): File = File(root, id).also { it.mkdirs() }
 
 	/** Takes over a file from elsewhere in Rui's storage, such as a deleted machine's disk. */
-	fun adopt(
-		file: File,
-		name: String,
-	): ImageRecord {
+	fun adopt(file: File, name: String): ImageRecord {
 		val id =
 			java.util.UUID
 				.randomUUID()
@@ -177,7 +155,9 @@ class ImageStore(
 		val dir = newFolder(id)
 		val target = File(dir, file.name)
 		if (!file.renameTo(target)) throw IOException("Couldn't keep ${file.name}")
-		val report = runCatching { RuiJson.decodeFromString<com.wonderhoylabs.rui.model.ImageReport>(Native.inspect(target.path)) }.getOrNull()
+		val report = runCatching {
+			RuiJson.decodeFromString<com.wonderhoylabs.rui.model.ImageReport>(Native.inspect(target.path))
+		}.getOrNull()
 		val record =
 			ImageRecord(
 				id = id,

@@ -13,9 +13,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 
-enum class TemplateKind(
-	val label: String,
-) {
+enum class TemplateKind(val label: String) {
 	Distro("Distro"),
 	Desktop("Desktop"),
 	App("App"),
@@ -56,6 +54,8 @@ data class BaseImage(
 )
 
 object Catalog {
+	private const val FEDORA = "https://download.fedoraproject.org/pub/fedora/linux/releases/43/Cloud/aarch64/images"
+
 	val debian13 =
 		BaseImage(
 			id = "debian-13-arm64",
@@ -79,8 +79,8 @@ object Catalog {
 	private val fedora43 =
 		BaseImage(
 			id = "fedora-43-arm64",
-			url = "https://download.fedoraproject.org/pub/fedora/linux/releases/43/Cloud/aarch64/images/Fedora-Cloud-Base-Generic-43-1.6.aarch64.qcow2",
-			checksums = "https://download.fedoraproject.org/pub/fedora/linux/releases/43/Cloud/aarch64/images/Fedora-Cloud-43-1.6-aarch64-CHECKSUM",
+			url = "$FEDORA/Fedora-Cloud-Base-Generic-43-1.6.aarch64.qcow2",
+			checksums = "$FEDORA/Fedora-Cloud-43-1.6-aarch64-CHECKSUM",
 			algorithm = "SHA-256",
 			file = "Fedora-Cloud-Base-Generic-43-1.6.aarch64.qcow2",
 			project = "Fedora",
@@ -99,7 +99,8 @@ object Catalog {
 			Template(
 				id = "debian-13",
 				name = "Debian 13",
-				description = "Debian's official 64-bit Arm cloud image, with a user, SSH and Rui's guest agent set up on first boot.",
+				description =
+					"Debian's official 64-bit Arm cloud image, with a user, SSH and Rui's guest agent set up on first boot.",
 				kind = TemplateKind.Distro,
 				baseImage = debian13,
 			),
@@ -114,7 +115,8 @@ object Catalog {
 			Template(
 				id = "fedora-43",
 				name = "Fedora 43",
-				description = "Fedora's official 64-bit Arm cloud image. Its root is Btrfs, so Rui boots it from the separate /boot.",
+				description =
+					"Fedora's official 64-bit Arm cloud image. Its root is Btrfs, so Rui boots it from the separate /boot.",
 				kind = TemplateKind.Distro,
 				baseImage = fedora43,
 				caveat = "Not booted under AVF yet.",
@@ -175,11 +177,7 @@ object Catalog {
 	 * Downloads a base image into the library, resuming a partial download, and checks it against the project's
 	 * checksum list before keeping it. Reuses an earlier download that passed.
 	 */
-	fun fetch(
-		base: BaseImage,
-		images: ImageStore,
-		job: Job,
-	): ImageRecord {
+	fun fetch(base: BaseImage, images: ImageStore, job: Job): ImageRecord {
 		images.images.value
 			.firstOrNull { it.id == base.id && images.file(it).exists() }
 			?.let { return it }
@@ -231,10 +229,7 @@ object Catalog {
 	}
 
 	/** Reads one line of a checksum list in either GNU (`hash  name`) or BSD (`SHA256 (name) = hash`) form. */
-	fun checksumFor(
-		line: String,
-		file: String,
-	): String? {
+	fun checksumFor(line: String, file: String): String? {
 		val trimmed = line.trim()
 		if (trimmed.contains("($file)")) return trimmed.substringAfterLast('=').trim()
 		val parts = trimmed.split(Regex("\\s+"))
@@ -242,12 +237,7 @@ object Catalog {
 		return null
 	}
 
-	private fun download(
-		url: String,
-		partial: File,
-		job: Job,
-		project: String,
-	) {
+	private fun download(url: String, partial: File, job: Job, project: String) {
 		var have = if (partial.exists()) partial.length() else 0L
 		val connection = URL(url).openConnection() as HttpURLConnection
 		connection.connectTimeout = 20_000

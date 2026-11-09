@@ -50,11 +50,7 @@ class PortForwarder {
 
 	private val listeners = ConcurrentHashMap<String, Closeable>()
 
-	fun startAll(
-		vmId: String,
-		forwards: List<PortForward>,
-		guest: RunningGuest,
-	) {
+	fun startAll(vmId: String, forwards: List<PortForward>, guest: RunningGuest) {
 		forwards.filter { it.enabled }.forEach { start(vmId, it, guest, temporary = false) }
 	}
 
@@ -68,11 +64,7 @@ class PortForwarder {
 	}
 
 	/** Restarts one VM's forwards after the user edits them. */
-	fun replace(
-		vmId: String,
-		forwards: List<PortForward>,
-		guest: RunningGuest,
-	) {
+	fun replace(vmId: String, forwards: List<PortForward>, guest: RunningGuest) {
 		state.value.values.filter { it.vmId == vmId && !it.temporary }.forEach { stop(it.forward.id) }
 		startAll(vmId, forwards, guest)
 	}
@@ -81,41 +73,40 @@ class PortForwarder {
 	 * A loopback-only port for an app outside Rui, such as an RDP client, reusing one already published for
 	 * [guestPort] if there is one. Returns the port on the phone.
 	 */
-	fun temporary(
-		vmId: String,
-		guestPort: Int,
-		guest: RunningGuest,
-	): Int {
+	fun temporary(vmId: String, guestPort: Int, guest: RunningGuest): Int {
 		state.value.values
-			.firstOrNull { it.vmId == vmId && it.forward.guestPort == guestPort && it.forward.protocol == Protocol.TCP && it.listening }
+			.firstOrNull {
+				it.vmId == vmId && it.forward.guestPort == guestPort && it.forward.protocol == Protocol.TCP &&
+					it.listening
+			}
 			?.let { return it.forward.hostPort }
 		val forward = PortForward(label = "For another app", hostPort = 0, guestPort = guestPort)
 		return start(vmId, forward, guest, temporary = true)
 	}
 
-	private fun start(
-		vmId: String,
-		forward: PortForward,
-		guest: RunningGuest,
-		temporary: Boolean,
-	): Int {
+	private fun start(vmId: String, forward: PortForward, guest: RunningGuest, temporary: Boolean): Int {
 		// 127.0.0.1, not getLoopbackAddress(), which is ::1 on Android: the page and other apps say 127.0.0.1.
-		val bind = if (forward.exposure == Exposure.LOOPBACK) InetAddress.getByName("127.0.0.1") else InetAddress.getByName("::")
+		val bind = if (forward.exposure ==
+			Exposure.LOOPBACK
+		) {
+			InetAddress.getByName("127.0.0.1")
+		} else {
+			InetAddress.getByName("::")
+		}
 		return try {
 			when (forward.protocol) {
 				Protocol.TCP -> startTcp(vmId, forward, guest, bind, temporary)
 				Protocol.UDP -> startUdp(vmId, forward, guest, bind, temporary)
 			}
 		} catch (error: IOException) {
-			state.update { it + (forward.id to ForwardStatus(vmId, forward, listening = false, error = describe(error, forward))) }
+			state.update {
+				it + (forward.id to ForwardStatus(vmId, forward, listening = false, error = describe(error, forward)))
+			}
 			-1
 		}
 	}
 
-	private fun describe(
-		error: IOException,
-		forward: PortForward,
-	): String =
+	private fun describe(error: IOException, forward: PortForward): String =
 		if (error.message?.contains("EADDRINUSE") == true || error is java.net.BindException) {
 			"Port ${forward.hostPort} is already in use on this phone"
 		} else if (forward.hostPort in 1..1023) {
@@ -147,18 +138,15 @@ class PortForwarder {
 					count(forward.id) { it.copy(refused = it.refused + 1) }
 					continue
 				}
-				thread(name = "forward-${published.hostPort}-conn", isDaemon = true) { serve(forward.id, client, guest, published.guestPort) }
+				thread(name = "forward-${published.hostPort}-conn", isDaemon = true) {
+					serve(forward.id, client, guest, published.guestPort)
+				}
 			}
 		}
 		return published.hostPort
 	}
 
-	private fun serve(
-		forwardId: String,
-		client: Socket,
-		guest: RunningGuest,
-		guestPort: Int,
-	) {
+	private fun serve(forwardId: String, client: Socket, guest: RunningGuest, guestPort: Int) {
 		val remote =
 			try {
 				guest.connect(guestPort)
@@ -245,10 +233,7 @@ class PortForwarder {
 		return output
 	}
 
-	private fun count(
-		forwardId: String,
-		change: (ForwardStatus) -> ForwardStatus,
-	) {
+	private fun count(forwardId: String, change: (ForwardStatus) -> ForwardStatus) {
 		state.update { current -> current[forwardId]?.let { current + (forwardId to change(it)) } ?: current }
 	}
 
@@ -258,12 +243,7 @@ class PortForwarder {
 		private const val MAX_DATAGRAM = 65_507
 
 		/** Copies both ways until both sides close, then calls [done] once. */
-		fun splice(
-			input: InputStream,
-			output: OutputStream,
-			remote: GuestConnection,
-			done: () -> Unit,
-		) {
+		fun splice(input: InputStream, output: OutputStream, remote: GuestConnection, done: () -> Unit) {
 			val upstream =
 				thread(name = "splice-up", isDaemon = true) {
 					runCatching { input.copyTo(remote.output) }

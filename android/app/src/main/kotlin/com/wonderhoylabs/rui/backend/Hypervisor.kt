@@ -20,19 +20,14 @@ interface ConsoleChannel : Closeable {
 	/** Null if this backend can only show the console, not type into it. */
 	val input: OutputStream?
 
-	fun resize(
-		rows: Int,
-		cols: Int,
-	) {}
+	fun resize(rows: Int, cols: Int) {}
 }
 
 /** Whether a backend can run machines on this phone, and if not, why, in words for the user. */
 sealed interface Availability {
 	data object Ready : Availability
 
-	data class Unavailable(
-		val reason: String,
-	) : Availability
+	data class Unavailable(val reason: String) : Availability
 }
 
 /** What a backend tells Rui about a machine it's running. */
@@ -69,9 +64,5 @@ interface Hypervisor {
 	fun availability(): Availability
 
 	/** Starts [vm], whose files are in [dir]. Blocks until it's running or has failed. */
-	fun start(
-		vm: VmConfig,
-		dir: File,
-		events: GuestEvents,
-	): RunningGuest
+	fun start(vm: VmConfig, dir: File, events: GuestEvents): RunningGuest
 }

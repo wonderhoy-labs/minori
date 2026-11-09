@@ -125,12 +125,17 @@ fun SetupScreen(model: AppModel) {
 							context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://shizuku.rikka.app/")))
 						}) { Text("About Shizuku") }
 					}
-					ShizukuState.NotRunning -> Text("Shizuku is installed but Rui can't reach it. Start it in the Shizuku app. If it's already running, close Rui and open it again.")
+
+					ShizukuState.NotRunning -> Text(
+						"Shizuku is installed but Rui can't reach it. Start it in the Shizuku app. If it's already running, close Rui and open it again.",
+					)
+
 					ShizukuState.NeedsPermission ->
 						Button(onClick = {
 							grantRequested = true
 							runCatching { Shizuku.requestPermission(SHIZUKU_REQUEST) }
 						}) { Text("Allow Rui in Shizuku") }
+
 					ShizukuState.Ready ->
 						Button(enabled = !working, onClick = { grantRequested = true }) {
 							Text(if (working) "Granting…" else "Grant with Shizuku")

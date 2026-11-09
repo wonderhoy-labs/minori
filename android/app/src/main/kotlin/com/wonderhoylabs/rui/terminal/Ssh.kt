@@ -23,10 +23,7 @@ class ShellChannel(
 )
 
 /** An SSH key pair, as OpenSSH writes them. */
-data class SshKey(
-	val privateKey: String,
-	val publicKey: String,
-)
+data class SshKey(val privateKey: String, val publicKey: String)
 
 object Ssh {
 	private const val CONNECT_TIMEOUT_MS = 20_000
@@ -34,8 +31,13 @@ object Ssh {
 	/** Makes an RSA key for logging in to a new VM. RSA works on every Android version without extra providers. */
 	fun generateKey(comment: String): SshKey {
 		val pair = KeyPair.genKeyPair(JSch(), KeyPair.RSA, 3072)
-		val private = ByteArrayOutputStream().also { pair.writePrivateKey(it) }.toString(Charsets.UTF_8)
-		val public = ByteArrayOutputStream().also { pair.writePublicKey(it, comment) }.toString(Charsets.UTF_8).trim()
+		val private = String(ByteArrayOutputStream().also { pair.writePrivateKey(it) }.toByteArray(), Charsets.UTF_8)
+		val public = String(
+			ByteArrayOutputStream().also {
+				pair.writePublicKey(it, comment)
+			}.toByteArray(),
+			Charsets.UTF_8,
+		).trim()
 		pair.dispose()
 		return SshKey(private, public)
 	}
@@ -95,10 +97,8 @@ object Ssh {
 		return TerminalSession(title, shell.output, shell.input, onResize = shell.resize, onClose = shell.close)
 	}
 
-	private class Prompts(
-		private val password: String?,
-		private val confirm: (String) -> Boolean,
-	) : UserInfo,
+	private class Prompts(private val password: String?, private val confirm: (String) -> Boolean) :
+		UserInfo,
 		UIKeyboardInteractive {
 		override fun getPassphrase(): String? = null
 
@@ -122,17 +122,10 @@ object Ssh {
 	}
 
 	/** Hands JSch a connection Rui already made, instead of letting it open a socket. */
-	private class GuestProxy(
-		private val open: () -> GuestConnection,
-	) : Proxy {
+	private class GuestProxy(private val open: () -> GuestConnection) : Proxy {
 		private var connection: GuestConnection? = null
 
-		override fun connect(
-			socketFactory: SocketFactory?,
-			host: String?,
-			port: Int,
-			timeout: Int,
-		) {
+		override fun connect(socketFactory: SocketFactory?, host: String?, port: Int, timeout: Int) {
 			connection = open()
 		}
 

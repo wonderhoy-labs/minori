@@ -83,20 +83,19 @@ private val PALETTE =
 		0xffffff,
 	)
 
-private fun colour(
-	value: Int,
-	default: Color,
-): Color {
+private fun colour(value: Int, default: Color): Color {
 	if (value == TerminalEmulator.DEFAULT) return default
 	if (value and TerminalEmulator.TRUE_COLOUR != 0) return Color(0xff000000.toInt() or (value and 0xffffff))
 	val rgb =
 		when (value) {
 			in 0..15 -> PALETTE[value]
+
 			in 16..231 -> {
 				val index = value - 16
 				val steps = intArrayOf(0, 95, 135, 175, 215, 255)
 				(steps[index / 36] shl 16) or (steps[(index / 6) % 6] shl 8) or steps[index % 6]
 			}
+
 			else -> {
 				val grey = 8 + (value - 232) * 10
 				(grey shl 16) or (grey shl 8) or grey
@@ -110,11 +109,7 @@ private fun colour(
  * of keys under the screen has what phone keyboards lack.
  */
 @Composable
-fun TerminalView(
-	session: TerminalSession,
-	modifier: Modifier = Modifier,
-	fontSize: Int = 13,
-) {
+fun TerminalView(session: TerminalSession, modifier: Modifier = Modifier, fontSize: Int = 13) {
 	val revision by session.changes.collectAsState()
 	val measurer = rememberTextMeasurer()
 	val style = TextStyle(fontFamily = FontFamily.Monospace, fontSize = fontSize.sp)
@@ -174,7 +169,8 @@ fun TerminalView(
 					}.semantics { contentDescription = "Terminal" }
 					.onPreviewKeyEvent { event ->
 						if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-						val bytes = terminalBytes(event.nativeKeyEvent, session.emulator.applicationCursorKeys) ?: return@onPreviewKeyEvent false
+						val bytes =
+							terminalBytes(event.nativeKeyEvent, session.emulator.applicationCursorKeys) ?: return@onPreviewKeyEvent false
 						send(bytes)
 						true
 					}.terminalInput(
@@ -201,14 +197,27 @@ fun TerminalView(
 						val text = AnnotatedString.Builder()
 						for (column in 0 until minOf(emulator.columns, row.chars.size)) {
 							val attrs = row.attrs[column]
-							var fg = colour(row.fg[column].let { if (attrs and TerminalEmulator.BOLD != 0 && it in 0..7) it + 8 else it }, foreground)
+							var fg = colour(
+								row.fg[column].let {
+									if (attrs and TerminalEmulator.BOLD != 0 &&
+										it in 0..7
+									) {
+										it + 8
+									} else {
+										it
+									}
+								},
+								foreground,
+							)
 							var bg = colour(row.bg[column], Color.Transparent)
 							if (attrs and TerminalEmulator.INVERSE != 0) {
 								val swap = if (bg == Color.Transparent) background else bg
 								bg = fg
 								fg = swap
 							}
-							if (line == emulator.cursorRow + scrollOffset && column == emulator.cursorCol && emulator.cursorVisible && scrollOffset == 0) {
+							if (line == emulator.cursorRow + scrollOffset && column == emulator.cursorCol && emulator.cursorVisible &&
+								scrollOffset == 0
+							) {
 								bg = foreground
 								fg = background
 							}
@@ -240,7 +249,9 @@ fun TerminalView(
 		}
 		if (session.canType) {
 			Row(
-				modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp, vertical = 2.dp),
+				modifier = Modifier.fillMaxWidth().horizontalScroll(
+					rememberScrollState(),
+				).padding(horizontal = 4.dp, vertical = 2.dp),
 				horizontalArrangement = Arrangement.spacedBy(4.dp),
 			) {
 				FilterChip(selected = false, onClick = { send("\u001b") }, label = { Text("Esc") })
@@ -256,7 +267,10 @@ fun TerminalView(
 				}
 				FilterChip(
 					selected = scrollOffset > 0,
-					onClick = { scrollOffset = if (scrollOffset > 0) 0 else minOf(session.emulator.scrollback.size, session.emulator.rows / 2) },
+					onClick = {
+						scrollOffset =
+							if (scrollOffset > 0) 0 else minOf(session.emulator.scrollback.size, session.emulator.rows / 2)
+					},
 					label = { Text(if (scrollOffset > 0) "Live" else "Scroll up") },
 				)
 			}
@@ -268,10 +282,7 @@ fun TerminalView(
 }
 
 @Composable
-fun TerminalEnded(
-	reason: String,
-	onClick: () -> Unit,
-) {
+fun TerminalEnded(reason: String, onClick: () -> Unit) {
 	Text(
 		reason,
 		style = MaterialTheme.typography.bodyMedium,
@@ -287,11 +298,7 @@ fun TerminalEnded(
 
 /** Measures the space a terminal will have, so a session can start at the right size. */
 @Composable
-fun TerminalMeasure(
-	modifier: Modifier = Modifier,
-	fontSize: Int = 13,
-	onMeasured: () -> Unit,
-) {
+fun TerminalMeasure(modifier: Modifier = Modifier, fontSize: Int = 13, onMeasured: () -> Unit) {
 	val measurer = rememberTextMeasurer()
 	val style = TextStyle(fontFamily = FontFamily.Monospace, fontSize = fontSize.sp)
 	val cell = remember(fontSize) { measurer.measure("M", style).size }

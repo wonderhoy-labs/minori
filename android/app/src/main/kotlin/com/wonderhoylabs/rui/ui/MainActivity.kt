@@ -46,31 +46,17 @@ sealed interface Screen {
 
 	data object Settings : Screen
 
-	data class Create(
-		val imageId: String? = null,
-		val templateId: String? = null,
-	) : Screen
+	data class Create(val imageId: String? = null, val templateId: String? = null) : Screen
 
-	data class Detail(
-		val vmId: String,
-	) : Screen
+	data class Detail(val vmId: String) : Screen
 
-	data class Edit(
-		val vmId: String,
-	) : Screen
+	data class Edit(val vmId: String) : Screen
 
-	data class Console(
-		val vmId: String,
-	) : Screen
+	data class Console(val vmId: String) : Screen
 
-	data class Ssh(
-		val vmId: String,
-	) : Screen
+	data class Ssh(val vmId: String) : Screen
 
-	data class Vnc(
-		val vmId: String,
-		val guestPort: Int,
-	) : Screen
+	data class Vnc(val vmId: String, val guestPort: Int) : Screen
 }
 
 /** The back stack, and the one long job (copying, downloading, exporting) that may be running. */
@@ -98,11 +84,7 @@ class AppModel : ViewModel() {
 	}
 
 	/** Runs [work] off the main thread with a progress dialog, then [then] on the main thread with its result. */
-	fun <T> run(
-		title: String,
-		work: (Job) -> T,
-		then: (T) -> Unit = {},
-	) {
+	fun <T> run(title: String, work: (Job) -> T, then: (T) -> Unit = {}) {
 		val running = Job(title)
 		job.value = running
 		scope.launch {
@@ -124,7 +106,11 @@ class MainActivity : ComponentActivity() {
 		if (savedInstanceState == null && privileges.avfFeature && !privileges.granted && app.vms.vms.value.isEmpty()) {
 			model.go(Screen.Setup)
 		}
-		if (intent?.getBooleanExtra(Privileges.AFTER_GRANT, false) == true && model.current != Screen.Setup) model.go(Screen.Setup)
+		if (intent?.getBooleanExtra(Privileges.AFTER_GRANT, false) == true &&
+			model.current != Screen.Setup
+		) {
+			model.go(Screen.Setup)
+		}
 		handleDevExtras(intent)
 		setContent {
 			RuiTheme {

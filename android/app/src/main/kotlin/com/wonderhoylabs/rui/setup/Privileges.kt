@@ -87,15 +87,14 @@ object Privileges {
 
 	const val AFTER_GRANT = "after_grant"
 
-	fun state(context: Context): PrivilegeState =
-		PrivilegeState(
-			sdk = Build.VERSION.SDK_INT,
-			buildType = Build.TYPE,
-			avfFeature = context.packageManager.hasSystemFeature(AVF_FEATURE),
-			missing = missingPermissions(context),
-			hiddenApi = HiddenApi.exempted,
-			shizuku = shizukuState(context),
-		)
+	fun state(context: Context): PrivilegeState = PrivilegeState(
+		sdk = Build.VERSION.SDK_INT,
+		buildType = Build.TYPE,
+		avfFeature = context.packageManager.hasSystemFeature(AVF_FEATURE),
+		missing = missingPermissions(context),
+		hiddenApi = HiddenApi.exempted,
+		shizuku = shizukuState(context),
+	)
 
 	fun shizukuState(context: Context): ShizukuState {
 		val installed = runCatching { context.packageManager.getPackageInfo(SHIZUKU_PACKAGE, 0) }.isSuccess
@@ -140,10 +139,7 @@ object ShizukuShell {
 
 	private val connection =
 		object : ServiceConnection {
-			override fun onServiceConnected(
-				name: ComponentName,
-				binder: IBinder?,
-			) {
+			override fun onServiceConnected(name: ComponentName, binder: IBinder?) {
 				service = binder?.takeIf { it.pingBinder() }?.let { IShell.Stub.asInterface(it) }
 				ready?.countDown()
 			}

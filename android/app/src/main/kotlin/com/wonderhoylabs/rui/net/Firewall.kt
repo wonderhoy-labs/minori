@@ -4,10 +4,7 @@ import com.wonderhoylabs.rui.model.PortForward
 import java.net.InetAddress
 
 /** An address or CIDR range, such as `192.168.1.0/24`, `10.0.0.5` or `fd00::/8`. */
-class AddressRange private constructor(
-	private val network: ByteArray,
-	private val prefix: Int,
-) {
+class AddressRange private constructor(private val network: ByteArray, private val prefix: Int) {
 	fun contains(address: InetAddress): Boolean {
 		val bytes = normalise(address.address)
 		if (bytes.size != network.size) return false
@@ -48,8 +45,14 @@ class AddressRange private constructor(
 		 * loopback as 127.0.0.1, so a rule about this phone covers both.
 		 */
 		private fun normalise(bytes: ByteArray): ByteArray {
-			if (bytes.size == 16 && bytes.take(15).all { it.toInt() == 0 } && bytes[15].toInt() == 1) return byteArrayOf(127, 0, 0, 1)
-			if (bytes.size == 16 && bytes.take(10).all { it.toInt() == 0 } && bytes[10].toInt() == -1 && bytes[11].toInt() == -1) {
+			if (bytes.size == 16 && bytes.take(15).all { it.toInt() == 0 } &&
+				bytes[15].toInt() == 1
+			) {
+				return byteArrayOf(127, 0, 0, 1)
+			}
+			if (bytes.size == 16 && bytes.take(10).all { it.toInt() == 0 } && bytes[10].toInt() == -1 &&
+				bytes[11].toInt() == -1
+			) {
 				return bytes.copyOfRange(12, 16)
 			}
 			return bytes
@@ -59,10 +62,7 @@ class AddressRange private constructor(
 
 /** Decides who may connect to a published port. Deny always wins; an empty allow list allows everyone else. */
 object Firewall {
-	fun allows(
-		forward: PortForward,
-		address: InetAddress,
-	): Boolean {
+	fun allows(forward: PortForward, address: InetAddress): Boolean {
 		if (forward.deny.mapNotNull(AddressRange::parse).any { it.contains(address) }) return false
 		val allow = forward.allow.mapNotNull(AddressRange::parse)
 		return allow.isEmpty() || allow.any { it.contains(address) }

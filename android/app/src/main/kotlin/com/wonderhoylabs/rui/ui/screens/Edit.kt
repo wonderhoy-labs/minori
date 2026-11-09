@@ -40,10 +40,7 @@ import com.wonderhoylabs.rui.ui.SubScreen
 
 /** Changes a stopped machine: name, CPUs, memory, disks, how it boots, and notes. */
 @Composable
-fun EditScreen(
-	model: AppModel,
-	vmId: String,
-) {
+fun EditScreen(model: AppModel, vmId: String) {
 	val context = LocalContext.current
 	val app = RuiApp.get(context)
 	val vms by app.vms.vms.collectAsState()
@@ -67,12 +64,23 @@ fun EditScreen(
 	var attaching by remember { mutableStateOf(false) }
 
 	SubScreen(title = "Edit ${vm.name}", model = model) {
-		if (!stopped) Text("Shut the machine down to change its resources and disks.", color = MaterialTheme.colorScheme.error)
+		if (!stopped) {
+			Text(
+				"Shut the machine down to change its resources and disks.",
+				color = MaterialTheme.colorScheme.error,
+			)
+		}
 		Section(title = "Machine") {
-			OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+			OutlinedTextField(value = name, onValueChange = {
+				name = it
+			}, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
 			SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-				SegmentedButton(selected = cpu == CpuMode.ONE, onClick = { cpu = CpuMode.ONE }, shape = SegmentedButtonDefaults.itemShape(0, 2), enabled = stopped) { Text("One CPU") }
-				SegmentedButton(selected = cpu == CpuMode.MATCH_HOST, onClick = { cpu = CpuMode.MATCH_HOST }, shape = SegmentedButtonDefaults.itemShape(1, 2), enabled = stopped) {
+				SegmentedButton(selected = cpu == CpuMode.ONE, onClick = {
+					cpu = CpuMode.ONE
+				}, shape = SegmentedButtonDefaults.itemShape(0, 2), enabled = stopped) { Text("One CPU") }
+				SegmentedButton(selected = cpu == CpuMode.MATCH_HOST, onClick = {
+					cpu = CpuMode.MATCH_HOST
+				}, shape = SegmentedButtonDefaults.itemShape(1, 2), enabled = stopped) {
 					Text("One per core")
 				}
 			}
@@ -84,7 +92,9 @@ fun EditScreen(
 				singleLine = true,
 				keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
 				isError = memoryWarning(memory.toLongOrNull() ?: 0, totalMib) != null,
-				supportingText = { Text(memoryWarning(memory.toLongOrNull() ?: 0, totalMib) ?: "This phone has ${totalMib / 1024} GiB.") },
+				supportingText = {
+					Text(memoryWarning(memory.toLongOrNull() ?: 0, totalMib) ?: "This phone has ${totalMib / 1024} GiB.")
+				},
 				modifier = Modifier.fillMaxWidth(),
 			)
 			Row(verticalAlignment = Alignment.CenterVertically) {
@@ -124,20 +134,28 @@ fun EditScreen(
 		}
 		if (vm.boot != null) {
 			Section(title = "Boot") {
-				OutlinedTextField(value = cmdline, onValueChange = { cmdline = it }, label = { Text("Kernel command line") }, modifier = Modifier.fillMaxWidth())
+				OutlinedTextField(value = cmdline, onValueChange = {
+					cmdline = it
+				}, label = { Text("Kernel command line") }, modifier = Modifier.fillMaxWidth())
 				OutlinedTextField(
 					value = console,
 					onValueChange = { console = it.trim() },
 					label = { Text("Console input device") },
 					singleLine = true,
-					supportingText = { Text("ttyS0 is AVF's serial console. The last console= on the command line gets the login prompt.") },
+					supportingText = {
+						Text("ttyS0 is AVF's serial console. The last console= on the command line gets the login prompt.")
+					},
 					modifier = Modifier.fillMaxWidth(),
 				)
 			}
 		}
 		Section(title = "Logging in") {
-			OutlinedTextField(value = user, onValueChange = { user = it }, label = { Text("User") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-			OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+			OutlinedTextField(value = user, onValueChange = {
+				user = it
+			}, label = { Text("User") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+			OutlinedTextField(value = password, onValueChange = {
+				password = it
+			}, label = { Text("Password") }, singleLine = true, modifier = Modifier.fillMaxWidth())
 			OutlinedTextField(
 				value = vncPort,
 				onValueChange = { vncPort = it.filter(Char::isDigit) },
@@ -146,7 +164,9 @@ fun EditScreen(
 				keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
 				modifier = Modifier.fillMaxWidth(),
 			)
-			OutlinedTextField(value = vncPassword, onValueChange = { vncPassword = it }, label = { Text("VNC password") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+			OutlinedTextField(value = vncPassword, onValueChange = {
+				vncPassword = it
+			}, label = { Text("VNC password") }, singleLine = true, modifier = Modifier.fillMaxWidth())
 		}
 		Section(title = "Notes") {
 			OutlinedTextField(value = notes, onValueChange = { notes = it }, modifier = Modifier.fillMaxWidth(), minLines = 3)
@@ -180,7 +200,9 @@ fun EditScreen(
 			title = { Text("Grow ${disk.label}") },
 			text = {
 				Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-					Text("It's $current GiB. Disks can only grow. Cloud images grow their filesystem on the next boot; others need growpart and resize2fs inside.")
+					Text(
+						"It's $current GiB. Disks can only grow. Cloud images grow their filesystem on the next boot; others need growpart and resize2fs inside.",
+					)
 					OutlinedTextField(
 						value = size,
 						onValueChange = { size = it.filter(Char::isDigit) },
@@ -214,7 +236,10 @@ fun EditScreen(
 						label = { Text("Size (GiB)") },
 						keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
 					)
-					Text("It appears in the guest as the next /dev/vd* disk, empty and unformatted.", style = MaterialTheme.typography.bodySmall)
+					Text(
+						"It appears in the guest as the next /dev/vd* disk, empty and unformatted.",
+						style = MaterialTheme.typography.bodySmall,
+					)
 				}
 			},
 			confirmButton = {

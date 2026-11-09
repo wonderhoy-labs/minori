@@ -28,18 +28,12 @@ data class DemoTarget(
  * not a VM: the console is a shell on the phone (or a TCP serial console a test points it at), and the guest's
  * ports are the phone's own loopback (or a rui-agent over TCP). Debug builds only, and always labelled.
  */
-class DemoHypervisor(
-	private val target: () -> DemoTarget,
-) : Hypervisor {
+class DemoHypervisor(private val target: () -> DemoTarget) : Hypervisor {
 	override val kind = BackendKind.DEMO
 
 	override fun availability(): Availability = Availability.Ready
 
-	override fun start(
-		vm: VmConfig,
-		dir: File,
-		events: GuestEvents,
-	): RunningGuest {
+	override fun start(vm: VmConfig, dir: File, events: GuestEvents): RunningGuest {
 		val target = target()
 		val console = target.console?.let { tcpConsole(it) } ?: shellConsole(vm, dir, events)
 		return object : RunningGuest, com.wonderhoylabs.rui.net.AgentGuest {
@@ -77,11 +71,7 @@ class DemoHypervisor(
 		}
 	}
 
-	private fun shellConsole(
-		vm: VmConfig,
-		dir: File,
-		events: GuestEvents,
-	): ConsoleChannel {
+	private fun shellConsole(vm: VmConfig, dir: File, events: GuestEvents): ConsoleChannel {
 		val home = File(dir, "home").apply { mkdirs() }
 		val prompt = vm.name.lowercase().replace(Regex("[^a-z0-9-]"), "-")
 		val rc = File(home, ".ruirc").apply { writeText("PS1='$prompt\$ '\n") }
@@ -92,7 +82,10 @@ class DemoHypervisor(
 				"PATH=/system/bin:/system/xbin",
 				"ENV=${rc.path}",
 			)
-		val (fd, pid) = Native.ptySpawn("/system/bin/sh", arrayOf("-i"), environment, home.path, 24, 80).let { it[0].toInt() to it[1].toInt() }
+		val (fd, pid) = Native.ptySpawn("/system/bin/sh", arrayOf("-i"), environment, home.path, 24, 80).let {
+			it[0].toInt() to
+				it[1].toInt()
+		}
 		val terminal = ParcelFileDescriptor.adoptFd(fd)
 		val banner =
 			"\u001b[1mRui demo backend\u001b[0m\r\nA shell on this phone, not a VM.\r\n\r\n"
@@ -105,10 +98,7 @@ class DemoHypervisor(
 				SequenceInputStream(ByteArrayInputStream(banner.toByteArray()), FileInputStream(terminal.fileDescriptor))
 			override val input: OutputStream = FileOutputStream(terminal.fileDescriptor)
 
-			override fun resize(
-				rows: Int,
-				cols: Int,
-			) = Native.ptyResize(terminal.fd, rows, cols)
+			override fun resize(rows: Int, cols: Int) = Native.ptyResize(terminal.fd, rows, cols)
 
 			override fun close() {
 				Native.ptyKill(pid, SIGHUP)

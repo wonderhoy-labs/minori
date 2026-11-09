@@ -117,10 +117,7 @@ fun Section(
 }
 
 @Composable
-fun Fact(
-	label: String,
-	value: String,
-) {
+fun Fact(label: String, value: String) {
 	Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
 		Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 		Spacer(Modifier.size(12.dp))
@@ -142,28 +139,23 @@ fun CommandBox(command: String) {
 	}
 }
 
-fun copy(
-	context: Context,
-	text: String,
-) {
+fun copy(context: Context, text: String) {
 	context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Rui", text))
 }
 
-fun stateLabel(state: VmState): String =
-	when (state) {
-		VmState.Stopped -> "Stopped"
-		VmState.Starting -> "Starting"
-		VmState.Running -> "Running"
-		VmState.Stopping -> "Stopping"
-		is VmState.Failed -> "Error"
-	}
+fun stateLabel(state: VmState): String = when (state) {
+	VmState.Stopped -> "Stopped"
+	VmState.Starting -> "Starting"
+	VmState.Running -> "Running"
+	VmState.Stopping -> "Stopping"
+	is VmState.Failed -> "Error"
+}
 
-fun backendLabel(kind: BackendKind): String =
-	when (kind) {
-		BackendKind.AVF -> "AVF VM"
-		BackendKind.DEMO -> "Demo shell"
-		BackendKind.TERMUX -> "Termux"
-	}
+fun backendLabel(kind: BackendKind): String = when (kind) {
+	BackendKind.AVF -> "AVF VM"
+	BackendKind.DEMO -> "Demo shell"
+	BackendKind.TERMUX -> "Termux"
+}
 
 @Composable
 fun StateChip(state: VmState) {
@@ -174,11 +166,13 @@ fun StateChip(state: VmState) {
 					containerColor = MaterialTheme.colorScheme.tertiaryContainer,
 					labelColor = MaterialTheme.colorScheme.onTertiaryContainer,
 				)
+
 			is VmState.Failed ->
 				AssistChipDefaults.assistChipColors(
 					containerColor = MaterialTheme.colorScheme.errorContainer,
 					labelColor = MaterialTheme.colorScheme.onErrorContainer,
 				)
+
 			else -> AssistChipDefaults.assistChipColors(containerColor = Color.Transparent)
 		}
 	AssistChip(onClick = {}, label = { Text(stateLabel(state)) }, colors = colours)
@@ -202,7 +196,13 @@ fun JobDialog(model: AppModel) {
 		text = {
 			Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
 				Text(step.ifEmpty { "Working" })
-				if (job.total > 0) LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth()) else LinearProgressIndicator(Modifier.fillMaxWidth())
+				if (job.total >
+					0
+				) {
+					LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
+				} else {
+					LinearProgressIndicator(Modifier.fillMaxWidth())
+				}
 			}
 		},
 		confirmButton = { TextButton(onClick = { job.cancelled = true }) { Text("Cancel") } },

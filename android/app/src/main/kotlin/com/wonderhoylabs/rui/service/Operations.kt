@@ -33,9 +33,7 @@ import java.security.SecureRandom
 import java.util.UUID
 
 /** Progress for the UI: what's happening, and how far along. Return false from [cancelled] checks to stop. */
-class Job(
-	val title: String,
-) {
+class Job(val title: String) {
 	@Volatile var step: String = ""
 
 	@Volatile var done: Long = 0
@@ -73,16 +71,9 @@ data class FirstBoot(
 )
 
 /** Everything that makes, changes or moves machines and images. All of it blocks; call on a background thread. */
-class Operations(
-	private val context: Context,
-	private val vms: VmStore,
-	private val images: ImageStore,
-) {
+class Operations(private val context: Context, private val vms: VmStore, private val images: ImageStore) {
 	/** Brings a file the user picked into the image library: copies it with a checksum, then inspects it. */
-	fun importImage(
-		uri: Uri,
-		job: Job,
-	): ImageRecord {
+	fun importImage(uri: Uri, job: Job): ImageRecord {
 		val resolver = context.contentResolver
 		var name = "image"
 		var size = -1L
@@ -94,7 +85,9 @@ class Operations(
 		}
 		val free = freeBytes(images.dir)
 		if (size > 0 && size + SPARE > free) {
-			throw IOException("There isn't enough space: ${name.take(40)} needs ${size.gib()} and the phone has ${free.gib()} free.")
+			throw IOException(
+				"There isn't enough space: ${name.take(40)} needs ${size.gib()} and the phone has ${free.gib()} free.",
+			)
 		}
 		val id = UUID.randomUUID().toString()
 		val dir = images.newFolder(id)
@@ -150,7 +143,11 @@ class Operations(
 		template: String? = null,
 	): VmConfig {
 		val report = image.report ?: RuiJson.decodeFromString(Native.inspect(images.file(image).path))
-		if (report.verdict == "wrong_arch") throw IOException("${image.name} is for x86-64 PCs. A phone can only run 64-bit Arm.")
+		if (report.verdict ==
+			"wrong_arch"
+		) {
+			throw IOException("${image.name} is for x86-64 PCs. A phone can only run 64-bit Arm.")
+		}
 		if (report.verdict == "windows") throw IOException("Rui can't boot Windows. See the catalog for why.")
 		val id = UUID.randomUUID().toString()
 		val dir = vms.dir(id).apply { mkdirs() }
@@ -180,7 +177,11 @@ class Operations(
 			val plan = report.boot
 			if (plan != null) {
 				job.step = "Finding the kernel"
-				Native.extractBoot(File(dir, bootDisk.file).path, RuiJson.encodeToString(com.wonderhoylabs.rui.model.BootPlan.serializer(), plan), File(dir, "boot").path)
+				Native.extractBoot(
+					File(dir, bootDisk.file).path,
+					RuiJson.encodeToString(com.wonderhoylabs.rui.model.BootPlan.serializer(), plan),
+					File(dir, "boot").path,
+				)
 				boot =
 					BootSettings(
 						diskId = bootDisk.id,
@@ -224,10 +225,7 @@ class Operations(
 	}
 
 	/** The cloud-init settings, with rui-agent and its service written in, as `rui_core::seed::CloudConfig` JSON. */
-	private fun cloudConfig(
-		firstBoot: FirstBoot,
-		publicKey: String?,
-	): String {
+	private fun cloudConfig(firstBoot: FirstBoot, publicKey: String?): String {
 		val files = mutableListOf<JsonObject>()
 		val run = mutableListOf<String>()
 		if (firstBoot.installAgent) {
@@ -267,22 +265,14 @@ class Operations(
 	}
 
 	/** Adds an empty data disk. */
-	fun addBlankDisk(
-		vm: VmConfig,
-		label: String,
-		sizeGib: Int,
-	): VmConfig {
+	fun addBlankDisk(vm: VmConfig, label: String, sizeGib: Int): VmConfig {
 		val disk = VmDisk(file = "disk-${UUID.randomUUID().toString().take(8)}.img", label = label, role = DiskRole.DATA)
 		Native.createBlank(vms.diskFile(vm, disk.file).path, sizeGib.toLong() * GIB)
 		return vms.update(vm.id) { it.copy(disks = it.disks + disk) }
 	}
 
 	/** Attaches an image from the library as another disk, copied so the library keeps its own. */
-	fun attachImage(
-		vm: VmConfig,
-		image: ImageRecord,
-		job: Job,
-	): VmConfig {
+	fun attachImage(vm: VmConfig, image: ImageRecord, job: Job): VmConfig {
 		val iso = image.report?.format == "iso"
 		val disk =
 			VmDisk(
@@ -296,45 +286,51 @@ class Operations(
 		return vms.update(vm.id) { it.copy(disks = it.disks + disk) }
 	}
 
-	fun removeDisk(
-		vm: VmConfig,
-		disk: VmDisk,
-	): VmConfig {
-		if (vm.boot?.diskId == disk.id) throw IOException("That's the disk ${vm.name} boots from. Choose another boot disk first.")
+	fun removeDisk(vm: VmConfig, disk: VmDisk): VmConfig {
+		if (vm.boot?.diskId ==
+			disk.id
+		) {
+			throw IOException("That's the disk ${vm.name} boots from. Choose another boot disk first.")
+		}
 		vms.diskFile(vm, disk.file).delete()
 		return vms.update(vm.id) { it.copy(disks = it.disks.filterNot { d -> d.id == disk.id }) }
 	}
 
-	fun growDisk(
-		vm: VmConfig,
-		disk: VmDisk,
-		sizeGib: Int,
-	): VmConfig {
+	fun growDisk(vm: VmConfig, disk: VmDisk, sizeGib: Int): VmConfig {
 		Native.grow(vms.diskFile(vm, disk.file).path, sizeGib.toLong() * GIB)
 		return vms.update(vm.id) { it }
 	}
 
 	/** Boots from another disk: finds its kernel and extracts it again. */
-	fun setBootDisk(
-		vm: VmConfig,
-		disk: VmDisk,
-	): VmConfig {
+	fun setBootDisk(vm: VmConfig, disk: VmDisk): VmConfig {
 		val path = vms.diskFile(vm, disk.file).path
 		val report = RuiJson.decodeFromString<ImageReport>(Native.inspect(path))
 		val plan = report.boot ?: throw IOException("Rui found no kernel it can boot on ${disk.label}.")
-		Native.extractBoot(path, RuiJson.encodeToString(com.wonderhoylabs.rui.model.BootPlan.serializer(), plan), File(vms.dir(vm.id), "boot").path)
+		Native.extractBoot(
+			path,
+			RuiJson.encodeToString(com.wonderhoylabs.rui.model.BootPlan.serializer(), plan),
+			File(vms.dir(vm.id), "boot").path,
+		)
 		return vms.update(vm.id) {
 			it.copy(
-				boot = BootSettings(diskId = disk.id, plan = plan, initrdFile = if (plan.initrd != null) "boot/initrd" else null, cmdline = plan.cmdline),
+				boot = BootSettings(
+					diskId = disk.id,
+					plan = plan,
+					initrdFile = if (plan.initrd !=
+						null
+					) {
+						"boot/initrd"
+					} else {
+						null
+					},
+					cmdline = plan.cmdline,
+				),
 			)
 		}
 	}
 
 	/** Copies a machine, disks and all. Sparse disks stay sparse. */
-	fun clone(
-		vm: VmConfig,
-		job: Job,
-	): VmConfig {
+	fun clone(vm: VmConfig, job: Job): VmConfig {
 		val id = UUID.randomUUID().toString()
 		val from = vms.dir(vm.id)
 		val to = vms.dir(id).apply { mkdirs() }
@@ -345,7 +341,12 @@ class Operations(
 			}
 			File(from, "boot").takeIf { it.exists() }?.copyRecursively(File(to, "boot"))
 			File(from, "ssh").takeIf { it.exists() }?.copyRecursively(File(to, "ssh"))
-			val copy = vm.copy(id = id, name = "${vm.name} copy", createdAt = System.currentTimeMillis(), network = vm.network.copy(forwards = emptyList()))
+			val copy = vm.copy(
+				id = id,
+				name = "${vm.name} copy",
+				createdAt = System.currentTimeMillis(),
+				network = vm.network.copy(forwards = emptyList()),
+			)
 			vms.save(copy)
 			return copy
 		} catch (error: Throwable) {
@@ -358,12 +359,7 @@ class Operations(
 	 * Exports a machine as a `.ruivm` archive into [outFd] (a file descriptor the user picked through the system's
 	 * file picker). Passwords and keys stay on the phone unless [includeSecrets].
 	 */
-	fun export(
-		vm: VmConfig,
-		outFd: Int,
-		includeSecrets: Boolean,
-		job: Job,
-	) {
+	fun export(vm: VmConfig, outFd: Int, includeSecrets: Boolean, job: Job) {
 		val stored = if (includeSecrets) vm else vm.copy(access = vm.access.copy(password = null, vncPassword = null))
 		val json = RuiJson.encodeToString(VmConfig.serializer(), stored)
 		val disks =
@@ -381,23 +377,28 @@ class Operations(
 	}
 
 	/** Imports a `.ruivm` archive from [inFd] as a new machine. */
-	fun importArchive(
-		inFd: Int,
-		total: Long,
-		job: Job,
-	): VmConfig {
+	fun importArchive(inFd: Int, total: Long, job: Job): VmConfig {
 		val id = UUID.randomUUID().toString()
 		val dir = vms.dir(id)
 		try {
-			val manifest = RuiJson.parseToJsonElement(Native.importArchive(inFd, total, dir.path, job.native("Unpacking"))).jsonObject
-			val stored = RuiJson.decodeFromJsonElement(VmConfig.serializer(), manifest["vm"] ?: throw IOException("The archive has no VM settings"))
+			val manifest = RuiJson.parseToJsonElement(
+				Native.importArchive(inFd, total, dir.path, job.native("Unpacking")),
+			).jsonObject
+			val stored = RuiJson.decodeFromJsonElement(
+				VmConfig.serializer(),
+				manifest["vm"] ?: throw IOException("The archive has no VM settings"),
+			)
 			var vm = stored.copy(id = id, createdAt = System.currentTimeMillis())
 			// The kernel isn't in the archive; it comes from the boot disk again.
 			val boot = vm.boot
 			if (boot != null) {
 				val disk = vm.disks.firstOrNull { it.id == boot.diskId }
 				if (disk != null) {
-					Native.extractBoot(File(dir, disk.file).path, RuiJson.encodeToString(com.wonderhoylabs.rui.model.BootPlan.serializer(), boot.plan), File(dir, "boot").path)
+					Native.extractBoot(
+						File(dir, disk.file).path,
+						RuiJson.encodeToString(com.wonderhoylabs.rui.model.BootPlan.serializer(), boot.plan),
+						File(dir, "boot").path,
+					)
 				}
 			}
 			if (vms.vms.value.any { it.name == vm.name }) vm = vm.copy(name = "${vm.name} (imported)")
@@ -429,4 +430,10 @@ class Operations(
 	}
 }
 
-fun Long.gib(): String = if (this >= Operations.GIB) "%.1f GiB".format(this.toDouble() / Operations.GIB) else "%d MiB".format(this / (1024 * 1024))
+/** A size for people: GiB from 1 GiB, MiB from 1 MiB, KiB below that. */
+fun Long.gib(): String =
+	when {
+		this >= Operations.GIB -> "%.1f GiB".format(this.toDouble() / Operations.GIB)
+		this >= 1024 * 1024 -> "%d MiB".format(this / (1024 * 1024))
+		else -> "%d KiB".format(this / 1024)
+	}

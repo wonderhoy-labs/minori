@@ -34,7 +34,10 @@ class RuiApp : Application() {
 			return DemoTarget(console = prefs.getString("console", null), agent = prefs.getString("agent", null))
 		}
 		set(value) {
-			getSharedPreferences("dev", MODE_PRIVATE).edit().putString("console", value.console).putString("agent", value.agent).apply()
+			getSharedPreferences(
+				"dev",
+				MODE_PRIVATE,
+			).edit().putString("console", value.console).putString("agent", value.agent).apply()
 		}
 
 	val storageRoot: File get() = filesDir

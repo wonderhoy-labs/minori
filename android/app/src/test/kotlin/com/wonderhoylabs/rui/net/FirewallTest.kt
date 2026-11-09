@@ -11,10 +11,8 @@ import java.net.InetAddress
 class FirewallTest {
 	private fun address(text: String) = InetAddress.getByName(text)
 
-	private fun forward(
-		allow: List<String> = emptyList(),
-		deny: List<String> = emptyList(),
-	) = PortForward(hostPort = 2222, guestPort = 22, allow = allow, deny = deny)
+	private fun forward(allow: List<String> = emptyList(), deny: List<String> = emptyList()) =
+		PortForward(hostPort = 2222, guestPort = 22, allow = allow, deny = deny)
 
 	@Test
 	fun allowsEveryoneWithoutRules() {

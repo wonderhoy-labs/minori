@@ -16,10 +16,7 @@ import javax.crypto.spec.SecretKeySpec
  * A small VNC (RFB 3.8) client: no password or a VNC password, raw and copy-rect updates, 32-bit colour, the
  * pointer and the keyboard. Enough for a guest desktop over Rui's own connection, where bandwidth is free.
  */
-class RfbClient(
-	private val connection: GuestConnection,
-	private val password: String?,
-) {
+class RfbClient(private val connection: GuestConnection, private val password: String?) {
 	private val input = DataInputStream(connection.input.buffered(64 * 1024))
 	private val output = DataOutputStream(BufferedOutputStream(connection.output))
 
@@ -53,6 +50,7 @@ class RfbClient(
 				output.writeByte(NONE)
 				output.flush()
 			}
+
 			VNC_AUTH in types -> {
 				output.writeByte(VNC_AUTH)
 				output.flush()
@@ -60,6 +58,7 @@ class RfbClient(
 				output.write(encryptChallenge(challenge, password ?: throw IOException("This VNC server needs a password")))
 				output.flush()
 			}
+
 			else -> throw IOException("This VNC server only offers security Rui doesn't support. Allow plain VNC passwords.")
 		}
 		if (input.readInt() != 0) throw IOException(runCatching { readReason() }.getOrDefault("The VNC password was refused"))
@@ -92,12 +91,11 @@ class RfbClient(
 		requestUpdate(incremental = false)
 	}
 
-	private fun readReason(): String = ByteArray(input.readInt().coerceIn(0, 4096)).also { input.readFully(it) }.toString(Charsets.UTF_8)
+	private fun readReason(): String = ByteArray(input.readInt().coerceIn(0, 4096)).also {
+		input.readFully(it)
+	}.toString(Charsets.UTF_8)
 
-	private fun resizeFramebuffer(
-		w: Int,
-		h: Int,
-	) {
+	private fun resizeFramebuffer(w: Int, h: Int) {
 		width = w
 		height = h
 		pixels = IntArray(w * h)
@@ -145,6 +143,7 @@ class RfbClient(
 								}
 								publish(x, y, w, h)
 							}
+
 							COPY_RECT -> {
 								val sx = input.readUnsignedShort()
 								val sy = input.readUnsignedShort()
@@ -153,37 +152,38 @@ class RfbClient(
 								for (line in 0 until h) System.arraycopy(copy, line * w, pixels, (y + line) * width + x, w)
 								publish(x, y, w, h)
 							}
+
 							DESKTOP_SIZE -> {
 								synchronized(this) { resizeFramebuffer(w, h) }
 								rowBuffer = ByteArray(w * 4)
 							}
+
 							else -> throw IOException("The VNC server sent encoding $encoding, which Rui didn't ask for")
 						}
 					}
 					requestUpdate(incremental = true)
 				}
+
 				1 -> {
 					input.readUnsignedByte()
 					input.readUnsignedShort()
 					val colours = input.readUnsignedShort()
 					input.skipBytes(colours * 6)
 				}
+
 				2 -> {}
+
 				3 -> {
 					input.skipBytes(3)
 					input.skipBytes(input.readInt())
 				}
+
 				else -> throw IOException("The VNC server sent message $type, which Rui doesn't understand")
 			}
 		}
 	}
 
-	private fun publish(
-		x: Int,
-		y: Int,
-		w: Int,
-		h: Int,
-	) {
+	private fun publish(x: Int, y: Int, w: Int, h: Int) {
 		val target = bitmap ?: return
 		if (w <= 0 || h <= 0 || x + w > width || y + h > height) return
 		target.setPixels(pixels, y * width + x, width, x, y, w, h)
@@ -191,11 +191,7 @@ class RfbClient(
 	}
 
 	@Synchronized
-	fun pointer(
-		x: Int,
-		y: Int,
-		buttons: Int,
-	) {
+	fun pointer(x: Int, y: Int, buttons: Int) {
 		runCatching {
 			output.writeByte(5)
 			output.writeByte(buttons)
@@ -206,10 +202,7 @@ class RfbClient(
 	}
 
 	@Synchronized
-	fun key(
-		keysym: Int,
-		down: Boolean,
-	) {
+	fun key(keysym: Int, down: Boolean) {
 		runCatching {
 			output.writeByte(4)
 			output.writeByte(if (down) 1 else 0)
@@ -250,10 +243,7 @@ class RfbClient(
 		private const val DESKTOP_SIZE = -223
 
 		/** VNC authentication: DES with the password as the key, each byte's bits reversed, as the RFB spec says. */
-		fun encryptChallenge(
-			challenge: ByteArray,
-			password: String,
-		): ByteArray {
+		fun encryptChallenge(challenge: ByteArray, password: String): ByteArray {
 			val key = ByteArray(8)
 			password.toByteArray(Charsets.ISO_8859_1).copyInto(key, 0, 0, minOf(8, password.length))
 			for (index in key.indices) key[index] = (Integer.reverse(key[index].toInt() and 0xff) ushr 24).toByte()

@@ -5,14 +5,8 @@ package com.wonderhoylabs.rui.terminal
  * erasing, scroll regions, insert and delete, the alternate screen, 16, 256 and 24-bit colour, and the replies to
  * cursor and device queries. It keeps scrollback, and changes [revision] whenever the screen changes.
  */
-class TerminalEmulator(
-	columns: Int = 80,
-	rows: Int = 24,
-	private val respond: (ByteArray) -> Unit = {},
-) {
-	class Row(
-		columns: Int,
-	) {
+class TerminalEmulator(columns: Int = 80, rows: Int = 24, private val respond: (ByteArray) -> Unit = {}) {
+	class Row(columns: Int) {
 		val chars = IntArray(columns) { ' '.code }
 		val fg = IntArray(columns) { DEFAULT }
 		val bg = IntArray(columns) { DEFAULT }
@@ -94,11 +88,7 @@ class TerminalEmulator(
 	fun allText(): String = (scrollback.map { it.text() } + screen.map { it.text() }).joinToString("\n").trimEnd()
 
 	@Synchronized
-	fun feed(
-		data: ByteArray,
-		offset: Int = 0,
-		length: Int = data.size,
-	) {
+	fun feed(data: ByteArray, offset: Int = 0, length: Int = data.size) {
 		for (index in offset until offset + length) {
 			val byte = data[index].toInt() and 0xff
 			if (utf8Remaining > 0) {
@@ -122,10 +112,7 @@ class TerminalEmulator(
 		revision++
 	}
 
-	private fun start(
-		bits: Int,
-		more: Int,
-	) {
+	private fun start(bits: Int, more: Int) {
 		utf8Code = bits
 		utf8Remaining = more
 	}
@@ -133,18 +120,23 @@ class TerminalEmulator(
 	private fun accept(code: Int) {
 		when (state) {
 			State.Ground -> ground(code)
+
 			State.Escape -> escape(code)
+
 			State.Csi -> csi(code)
+
 			State.Osc ->
 				when (code) {
 					BEL -> endOsc()
 					ESC -> state = State.OscEscape
 					else -> if (osc.length < MAX_OSC) osc.appendCodePoint(code)
 				}
+
 			State.OscEscape -> {
 				endOsc()
 				if (code != '\\'.code) escape(code)
 			}
+
 			State.Charset -> state = State.Ground
 		}
 	}
@@ -152,17 +144,23 @@ class TerminalEmulator(
 	private fun ground(code: Int) {
 		when (code) {
 			ESC -> state = State.Escape
+
 			'\r'.code -> {
 				cursorCol = 0
 				wrapPending = false
 			}
+
 			'\n'.code, 0x0b, 0x0c -> lineFeed()
+
 			'\b'.code -> {
 				if (cursorCol > 0) cursorCol--
 				wrapPending = false
 			}
+
 			'\t'.code -> tab()
+
 			BEL, 0x0e, 0x0f, 0 -> {}
+
 			else -> if (code >= 0x20 && code != 0x7f) print(code)
 		}
 	}
@@ -184,12 +182,7 @@ class TerminalEmulator(
 		if (cursorCol == columns - 1) wrapPending = true else cursorCol++
 	}
 
-	private fun moveCell(
-		from: Row,
-		fromCol: Int,
-		to: Row,
-		toCol: Int,
-	) {
+	private fun moveCell(from: Row, fromCol: Int, to: Row, toCol: Int) {
 		to.chars[toCol] = from.chars[fromCol]
 		to.fg[toCol] = from.fg[fromCol]
 		to.bg[toCol] = from.bg[fromCol]
@@ -197,12 +190,20 @@ class TerminalEmulator(
 	}
 
 	private fun lineFeed() {
-		if (cursorRow == scrollBottom) scrollUp(1) else if (cursorRow < rows - 1) cursorRow++
+		if (cursorRow == scrollBottom) {
+			scrollUp(1)
+		} else if (cursorRow < rows - 1) {
+			cursorRow++
+		}
 		wrapPending = false
 	}
 
 	private fun reverseIndex() {
-		if (cursorRow == scrollTop) scrollDown(1) else if (cursorRow > 0) cursorRow--
+		if (cursorRow == scrollTop) {
+			scrollDown(1)
+		} else if (cursorRow > 0) {
+			cursorRow--
+		}
 		wrapPending = false
 	}
 
@@ -250,22 +251,33 @@ class TerminalEmulator(
 				privateMarker = 0.toChar()
 				intermediate = 0.toChar()
 			}
+
 			']' -> {
 				state = State.Osc
 				osc.setLength(0)
 			}
+
 			'(', ')', '*', '+' -> state = State.Charset
+
 			'7' -> saveCursor()
+
 			'8' -> restoreCursor()
+
 			'D' -> lineFeed()
+
 			'E' -> {
 				cursorCol = 0
 				lineFeed()
 			}
+
 			'M' -> reverseIndex()
+
 			'H' -> tabStops[cursorCol] = true
+
 			'c' -> reset()
+
 			'=', '>' -> {}
+
 			else -> {}
 		}
 	}
@@ -284,27 +296,31 @@ class TerminalEmulator(
 		val char = code.toChar()
 		when {
 			char in '0'..'9' -> param = (if (param < 0) 0 else param) * 10 + (code - '0'.code)
+
 			char == ';' || char == ':' -> {
 				params.add(param)
 				param = -1
 			}
+
 			char == '?' || char == '>' || char == '<' || char == '=' -> privateMarker = char
+
 			char == ' ' || char == '!' || char == '"' || char == '$' || char == '\'' -> intermediate = char
+
 			code in 0x40..0x7e -> {
 				params.add(param)
 				state = State.Ground
 				dispatch(char)
 			}
+
 			code == ESC -> state = State.Escape
+
 			code < 0x20 -> ground(code)
+
 			else -> state = State.Ground
 		}
 	}
 
-	private fun arg(
-		index: Int,
-		default: Int = 1,
-	): Int {
+	private fun arg(index: Int, default: Int = 1): Int {
 		val value = params.getOrNull(index) ?: -1
 		return if (value <= 0) default else value
 	}
@@ -324,24 +340,43 @@ class TerminalEmulator(
 		}
 		when (command) {
 			'A' -> moveTo(cursorRow - arg(0), cursorCol)
+
 			'B', 'e' -> moveTo(cursorRow + arg(0), cursorCol)
+
 			'C', 'a' -> moveTo(cursorRow, cursorCol + arg(0))
+
 			'D' -> moveTo(cursorRow, cursorCol - arg(0))
+
 			'E' -> moveTo(cursorRow + arg(0), 0)
+
 			'F' -> moveTo(cursorRow - arg(0), 0)
+
 			'G', '`' -> moveTo(cursorRow, arg(0) - 1)
+
 			'd' -> moveTo((if (originMode) scrollTop else 0) + arg(0) - 1, cursorCol)
+
 			'H', 'f' -> moveTo((if (originMode) scrollTop else 0) + arg(0) - 1, arg(1) - 1)
+
 			'J' -> eraseDisplay(arg(0, 0))
+
 			'K' -> eraseLine(arg(0, 0))
+
 			'L' -> if (cursorRow in scrollTop..scrollBottom) withRegion(cursorRow) { scrollDown(arg(0)) }
+
 			'M' -> if (cursorRow in scrollTop..scrollBottom) withRegion(cursorRow) { scrollUp(arg(0)) }
+
 			'@' -> insertChars(arg(0))
+
 			'P' -> deleteChars(arg(0))
+
 			'X' -> eraseChars(arg(0))
+
 			'S' -> scrollUp(arg(0))
+
 			'T' -> scrollDown(arg(0))
+
 			'm' -> sgr()
+
 			'r' -> {
 				val top = arg(0) - 1
 				val bottom = (params.getOrNull(1)?.takeIf { it > 0 } ?: rows) - 1
@@ -351,31 +386,37 @@ class TerminalEmulator(
 					moveTo(if (originMode) top else 0, 0)
 				}
 			}
+
 			's' -> saveCursor()
+
 			'u' -> restoreCursor()
+
 			'h' -> if (arg(0, 0) == 4) insertMode = true
+
 			'l' -> if (arg(0, 0) == 4) insertMode = false
+
 			'n' ->
 				when (arg(0, 0)) {
 					5 -> reply("\u001b[0n")
 					6 -> reply("\u001b[${cursorRow + 1};${cursorCol + 1}R")
 				}
+
 			'c' -> reply("\u001b[?62;22c")
+
 			'g' ->
 				when (arg(0, 0)) {
 					0 -> tabStops[cursorCol] = false
 					3 -> tabStops.fill(false)
 				}
+
 			// The text area's size, which a serial console's guest asks for because nothing else tells it.
 			't' -> if (arg(0, 0) == 18) reply("\u001b[8;$rows;${columns}t")
+
 			else -> {}
 		}
 	}
 
-	private inline fun withRegion(
-		top: Int,
-		action: () -> Unit,
-	) {
+	private inline fun withRegion(top: Int, action: () -> Unit) {
 		val savedTop = scrollTop
 		scrollTop = top
 		action()
@@ -384,43 +425,41 @@ class TerminalEmulator(
 		wrapPending = false
 	}
 
-	private fun setMode(
-		mode: Int,
-		on: Boolean,
-	) {
+	private fun setMode(mode: Int, on: Boolean) {
 		when (mode) {
 			1 -> applicationCursorKeys = on
+
 			6 -> {
 				originMode = on
 				moveTo(if (on) scrollTop else 0, 0)
 			}
+
 			7 -> autowrap = on
+
 			25 -> cursorVisible = on
+
 			47, 1047 -> switchScreen(on, clear = mode == 1047)
+
 			1048 -> if (on) saveCursor() else restoreCursor()
+
 			1049 -> {
 				if (on) saveCursor()
 				switchScreen(on, clear = true)
 				if (!on) restoreCursor()
 			}
+
 			2004 -> bracketedPaste = on
 		}
 	}
 
-	private fun switchScreen(
-		alternate: Boolean,
-		clear: Boolean,
-	) {
+	private fun switchScreen(alternate: Boolean, clear: Boolean) {
 		screen = if (alternate) alt else main
 		if (alternate && clear) alt.forEach { blank(it) }
 		scrollTop = 0
 		scrollBottom = rows - 1
 	}
 
-	private fun moveTo(
-		row: Int,
-		col: Int,
-	) {
+	private fun moveTo(row: Int, col: Int) {
 		val top = if (originMode) scrollTop else 0
 		val bottom = if (originMode) scrollBottom else rows - 1
 		cursorRow = row.coerceIn(top, bottom)
@@ -434,11 +473,14 @@ class TerminalEmulator(
 				eraseLine(0)
 				for (index in cursorRow + 1 until rows) blank(screen[index])
 			}
+
 			1 -> {
 				eraseLine(1)
 				for (index in 0 until cursorRow) blank(screen[index])
 			}
+
 			2 -> screen.forEach { blank(it) }
+
 			3 -> scrollback.clear()
 		}
 	}
@@ -455,10 +497,7 @@ class TerminalEmulator(
 		wrapPending = false
 	}
 
-	private fun clearCell(
-		row: Row,
-		column: Int,
-	) {
+	private fun clearCell(row: Row, column: Int) {
 		row.chars[column] = ' '.code
 		row.fg[column] = DEFAULT
 		row.bg[column] = bg
@@ -493,25 +532,45 @@ class TerminalEmulator(
 		while (index < params.size) {
 			when (val code = params[index].coerceAtLeast(0)) {
 				0 -> resetStyle()
+
 				1 -> attrs = attrs or BOLD
+
 				2 -> attrs = attrs or DIM
+
 				3 -> attrs = attrs or ITALIC
+
 				4 -> attrs = attrs or UNDERLINE
+
 				7 -> attrs = attrs or INVERSE
+
 				8 -> attrs = attrs or HIDDEN
+
 				9 -> attrs = attrs or STRIKE
+
 				21, 22 -> attrs = attrs and (BOLD or DIM).inv()
+
 				23 -> attrs = attrs and ITALIC.inv()
+
 				24 -> attrs = attrs and UNDERLINE.inv()
+
 				27 -> attrs = attrs and INVERSE.inv()
+
 				28 -> attrs = attrs and HIDDEN.inv()
+
 				29 -> attrs = attrs and STRIKE.inv()
+
 				in 30..37 -> fg = code - 30
+
 				39 -> fg = DEFAULT
+
 				in 40..47 -> bg = code - 40
+
 				49 -> bg = DEFAULT
+
 				in 90..97 -> fg = code - 90 + 8
+
 				in 100..107 -> bg = code - 100 + 8
+
 				38, 48 -> {
 					val (colour, used) = extendedColour(index + 1)
 					if (code == 38) fg = colour ?: fg else bg = colour ?: bg
@@ -522,17 +581,18 @@ class TerminalEmulator(
 		}
 	}
 
-	private fun extendedColour(at: Int): Pair<Int?, Int> =
-		when (params.getOrNull(at)) {
-			5 -> (params.getOrNull(at + 1)?.coerceIn(0, 255)) to 2
-			2 -> {
-				val red = params.getOrNull(at + 1)?.coerceIn(0, 255) ?: 0
-				val green = params.getOrNull(at + 2)?.coerceIn(0, 255) ?: 0
-				val blue = params.getOrNull(at + 3)?.coerceIn(0, 255) ?: 0
-				(TRUE_COLOUR or (red shl 16) or (green shl 8) or blue) to 4
-			}
-			else -> null to 0
+	private fun extendedColour(at: Int): Pair<Int?, Int> = when (params.getOrNull(at)) {
+		5 -> (params.getOrNull(at + 1)?.coerceIn(0, 255)) to 2
+
+		2 -> {
+			val red = params.getOrNull(at + 1)?.coerceIn(0, 255) ?: 0
+			val green = params.getOrNull(at + 2)?.coerceIn(0, 255) ?: 0
+			val blue = params.getOrNull(at + 3)?.coerceIn(0, 255) ?: 0
+			(TRUE_COLOUR or (red shl 16) or (green shl 8) or blue) to 4
 		}
+
+		else -> null to 0
+	}
 
 	private fun resetStyle() {
 		fg = DEFAULT
@@ -574,10 +634,7 @@ class TerminalEmulator(
 
 	/** Changes the size, keeping what fits, as xterm does. */
 	@Synchronized
-	fun resize(
-		newColumns: Int,
-		newRows: Int,
-	) {
+	fun resize(newColumns: Int, newRows: Int) {
 		if (newColumns == columns && newRows == rows) return
 		if (newColumns < 2 || newRows < 2) return
 		fun remake(old: Array<Row>): Array<Row> {

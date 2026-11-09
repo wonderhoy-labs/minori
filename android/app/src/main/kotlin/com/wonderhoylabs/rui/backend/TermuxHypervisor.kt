@@ -13,11 +13,7 @@ import java.net.InetSocketAddress
 import java.net.Socket
 
 /** A Linux userland Termux's proot-distro can install, and how to put an SSH server in it. */
-data class TermuxDistro(
-	val id: String,
-	val name: String,
-	val installSsh: String,
-)
+data class TermuxDistro(val id: String, val name: String, val installSsh: String)
 
 /**
  * Machines that are proot-distro userlands in Termux, for phones without AVF. They share the phone's kernel and
@@ -25,17 +21,17 @@ data class TermuxDistro(
  * documented `RUN_COMMAND` intent, which the user allows by setting `allow-external-apps = true` in
  * `~/.termux/termux.properties`. The console is SSH to an sshd inside the userland on the phone's loopback.
  */
-class TermuxHypervisor(
-	private val context: Context,
-) : Hypervisor {
+class TermuxHypervisor(private val context: Context) : Hypervisor {
 	override val kind = BackendKind.TERMUX
 
 	override fun availability(): Availability {
 		val installed = runCatching { context.packageManager.getPackageInfo(TERMUX, 0) }.isSuccess
 		return when {
 			!installed -> Availability.Unavailable("Termux isn't installed. Install it from F-Droid or its GitHub releases.")
+
 			context.checkSelfPermission(RUN_COMMAND_PERMISSION) != PackageManager.PERMISSION_GRANTED ->
 				Availability.Unavailable("Rui needs permission to run commands in Termux.")
+
 			else -> Availability.Ready
 		}
 	}
@@ -43,12 +39,9 @@ class TermuxHypervisor(
 	/** The port a machine's sshd listens on, the same every time. */
 	fun port(vm: VmConfig): Int = PORT_BASE + (vm.id.hashCode() and 0x7fffffff) % PORT_RANGE
 
-	override fun start(
-		vm: VmConfig,
-		dir: File,
-		events: GuestEvents,
-	): RunningGuest {
-		val distro = DISTROS.firstOrNull { it.id == vm.distro } ?: throw IOException("Pick a distribution for this Termux machine.")
+	override fun start(vm: VmConfig, dir: File, events: GuestEvents): RunningGuest {
+		val distro =
+			DISTROS.firstOrNull { it.id == vm.distro } ?: throw IOException("Pick a distribution for this Termux machine.")
 		val password = vm.access.password ?: throw IOException("This machine has no password set.")
 		val port = port(vm)
 		val firstRun = !File(dir, SET_UP_MARKER).exists()
@@ -57,7 +50,11 @@ class TermuxHypervisor(
 		while (!listening(port)) {
 			if (System.currentTimeMillis() > deadline) {
 				throw IOException(
-					if (firstRun) "Termux is still setting up ${distro.name}. Watch it in Termux, then start again." else "The machine's SSH server didn't start in Termux.",
+					if (firstRun) {
+						"Termux is still setting up ${distro.name}. Watch it in Termux, then start again."
+					} else {
+						"The machine's SSH server didn't start in Termux."
+					},
 				)
 			}
 			Thread.sleep(POLL_MS)
@@ -80,10 +77,7 @@ class TermuxHypervisor(
 					override val output: InputStream = shell.output
 					override val input = shell.input
 
-					override fun resize(
-						rows: Int,
-						cols: Int,
-					) = shell.resize(rows, cols)
+					override fun resize(rows: Int, cols: Int) = shell.resize(rows, cols)
 
 					override fun close() = shell.close()
 				}
@@ -106,17 +100,12 @@ class TermuxHypervisor(
 		}
 	}
 
-	private fun listening(port: Int): Boolean =
-		runCatching {
-			Socket().use { it.connect(InetSocketAddress("127.0.0.1", port), 500) }
-			true
-		}.getOrDefault(false)
+	private fun listening(port: Int): Boolean = runCatching {
+		Socket().use { it.connect(InetSocketAddress("127.0.0.1", port), 500) }
+		true
+	}.getOrDefault(false)
 
-	private fun script(
-		distro: TermuxDistro,
-		port: Int,
-		password: String,
-	): String {
+	private fun script(distro: TermuxDistro, port: Int, password: String): String {
 		val inside =
 			"${distro.installSsh} && mkdir -p /run/sshd && ssh-keygen -A && echo 'root:$password' | chpasswd && " +
 				"exec /usr/sbin/sshd -D -p $port -o PermitRootLogin=yes -o PasswordAuthentication=yes -o ListenAddress=127.0.0.1"
@@ -125,10 +114,7 @@ class TermuxHypervisor(
 			"proot-distro login ${distro.id} -- sh -c \"$inside\""
 	}
 
-	private fun run(
-		script: String,
-		background: Boolean,
-	) {
+	private fun run(script: String, background: Boolean) {
 		val intent =
 			Intent()
 				.setClassName(TERMUX, "com.termux.app.RunCommandService")
@@ -157,8 +143,16 @@ class TermuxHypervisor(
 
 		val DISTROS =
 			listOf(
-				TermuxDistro("debian", "Debian", "(command -v sshd >/dev/null || (apt-get update && apt-get install -y openssh-server))"),
-				TermuxDistro("ubuntu", "Ubuntu", "(command -v sshd >/dev/null || (apt-get update && apt-get install -y openssh-server))"),
+				TermuxDistro(
+					"debian",
+					"Debian",
+					"(command -v sshd >/dev/null || (apt-get update && apt-get install -y openssh-server))",
+				),
+				TermuxDistro(
+					"ubuntu",
+					"Ubuntu",
+					"(command -v sshd >/dev/null || (apt-get update && apt-get install -y openssh-server))",
+				),
 				TermuxDistro("archlinux", "Arch Linux", "(command -v sshd >/dev/null || pacman -Sy --noconfirm openssh)"),
 				TermuxDistro("alpine", "Alpine", "(command -v sshd >/dev/null || apk add openssh)"),
 				TermuxDistro("fedora", "Fedora", "(command -v sshd >/dev/null || dnf install -y openssh-server)"),

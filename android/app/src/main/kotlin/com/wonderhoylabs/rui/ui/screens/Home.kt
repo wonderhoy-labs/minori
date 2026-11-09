@@ -77,7 +77,9 @@ fun HomeScreen(model: AppModel) {
 				Row(modifier = Modifier.fillMaxWidth().padding(top = 32.dp), verticalAlignment = Alignment.CenterVertically) {
 					BrandHeader(subtitle = "Virtual machines on this phone", modifier = Modifier.weight(1f))
 					IconButton(onClick = { model.go(Screen.Images) }) { Icon(Icons.Filled.Album, contentDescription = "Images") }
-					IconButton(onClick = { model.go(Screen.Settings) }) { Icon(Icons.Filled.Settings, contentDescription = "Settings") }
+					IconButton(onClick = {
+						model.go(Screen.Settings)
+					}) { Icon(Icons.Filled.Settings, contentDescription = "Settings") }
 				}
 			}
 			item { StatusCard(avf, onSetup = { model.go(Screen.Setup) }) }
@@ -116,17 +118,16 @@ fun HomeScreen(model: AppModel) {
 }
 
 @Composable
-private fun StatusCard(
-	avf: Availability,
-	onSetup: () -> Unit,
-) {
+private fun StatusCard(avf: Availability, onSetup: () -> Unit) {
 	val ready = avf == Availability.Ready
 	Card(
 		modifier = Modifier.fillMaxWidth().clickable(onClick = onSetup),
 		colors =
 			CardDefaults.cardColors(
-				containerColor = if (ready) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
-				contentColor = if (ready) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+				containerColor =
+					if (ready) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
+				contentColor =
+					if (ready) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
 			),
 	) {
 		Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -143,18 +144,15 @@ private fun StatusCard(
 }
 
 @Composable
-private fun VmCard(
-	vm: VmConfig,
-	state: VmState,
-	onOpen: () -> Unit,
-	onStart: () -> Unit,
-	onStop: () -> Unit,
-) {
+private fun VmCard(vm: VmConfig, state: VmState, onOpen: () -> Unit, onStart: () -> Unit, onStop: () -> Unit) {
 	Card(
 		modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen),
 		colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
 	) {
-		Row(modifier = Modifier.padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+		Row(
+			modifier = Modifier.padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+			verticalAlignment = Alignment.CenterVertically,
+		) {
 			Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
 				Text(vm.name, style = MaterialTheme.typography.titleMedium)
 				Text(
@@ -171,7 +169,10 @@ private fun VmCard(
 			}
 			val running = state == VmState.Running || state == VmState.Starting
 			FilledTonalIconButton(onClick = if (running) onStop else onStart, enabled = state != VmState.Stopping) {
-				Icon(if (running) Icons.Filled.Stop else Icons.Filled.PlayArrow, contentDescription = if (running) "Stop" else "Start")
+				Icon(
+					if (running) Icons.Filled.Stop else Icons.Filled.PlayArrow,
+					contentDescription = if (running) "Stop" else "Start",
+				)
 			}
 		}
 	}

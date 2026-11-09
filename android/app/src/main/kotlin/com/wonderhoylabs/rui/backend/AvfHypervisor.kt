@@ -28,9 +28,7 @@ import java.util.concurrent.Executors
  * (`VirtualMachineCustomImageConfig`) and console input are hidden API on Android 17, reached through
  * [HiddenApi]. Everything AVF-specific is in this one file, so it's the only thing to change when Android does.
  */
-class AvfHypervisor(
-	private val context: Context,
-) : Hypervisor {
+class AvfHypervisor(private val context: Context) : Hypervisor {
 	override val kind = BackendKind.AVF
 
 	private val executor = Executors.newSingleThreadExecutor { Thread(it, "avf-callbacks").apply { isDaemon = true } }
@@ -49,22 +47,19 @@ class AvfHypervisor(
 		if (!HiddenApi.exempted) {
 			return Availability.Unavailable("This Android version blocks the AVF calls Rui needs to boot your own kernel.")
 		}
-		val capabilities = runCatching { manager().capabilities }.getOrElse { return Availability.Unavailable(it.message ?: "AVF didn't answer") }
+		val capabilities = runCatching {
+			manager().capabilities
+		}.getOrElse { return Availability.Unavailable(it.message ?: "AVF didn't answer") }
 		if (capabilities and VirtualMachineManager.CAPABILITY_NON_PROTECTED_VM == 0) {
 			return Availability.Unavailable("AVF on this device only runs protected VMs, which can't boot your own images.")
 		}
 		return Availability.Ready
 	}
 
-	private fun manager(): VirtualMachineManager =
-		context.getSystemService(VirtualMachineManager::class.java)
-			?: throw IOException("AVF's VirtualMachineManager isn't available on this device")
+	private fun manager(): VirtualMachineManager = context.getSystemService(VirtualMachineManager::class.java)
+		?: throw IOException("AVF's VirtualMachineManager isn't available on this device")
 
-	override fun start(
-		vm: VmConfig,
-		dir: File,
-		events: GuestEvents,
-	): RunningGuest {
+	override fun start(vm: VmConfig, dir: File, events: GuestEvents): RunningGuest {
 		val boot = vm.boot ?: throw IOException("${vm.name} has no kernel to boot. Pick a bootable image for it.")
 		val kernel = File(dir, boot.kernelFile)
 		if (!kernel.exists()) throw IOException("${vm.name}'s kernel is missing. Edit the VM and choose its boot disk again.")
@@ -77,7 +72,15 @@ class AvfHypervisor(
 				.apply { boot.cmdline.split(' ').filter { it.isNotBlank() }.forEach { addParam(it) } }
 				.apply {
 					// The boot disk first, so it's /dev/vda, then the rest in the order the user set.
-					val ordered = vm.disks.sortedBy { if (it.id == boot.diskId) 0 else if (it.role == DiskRole.SEED) 2 else 1 }
+					val ordered = vm.disks.sortedBy {
+						if (it.id == boot.diskId) {
+							0
+						} else if (it.role == DiskRole.SEED) {
+							2
+						} else {
+							1
+						}
+					}
 					for (disk in ordered) {
 						val path = File(dir, disk.file).path
 						addDisk(
@@ -97,7 +100,13 @@ class AvfHypervisor(
 				.setProtectedVm(false)
 				.setMemoryBytes(vm.memoryMib.toLong() * 1024 * 1024)
 				.setCpuTopology(
-					if (vm.cpu == CpuMode.ONE) VirtualMachineConfig.CPU_TOPOLOGY_ONE_CPU else VirtualMachineConfig.CPU_TOPOLOGY_MATCH_HOST,
+					if (vm.cpu ==
+						CpuMode.ONE
+					) {
+						VirtualMachineConfig.CPU_TOPOLOGY_ONE_CPU
+					} else {
+						VirtualMachineConfig.CPU_TOPOLOGY_MATCH_HOST
+					},
 				)
 				// AVF only gives the console of a debuggable VM to the app that started it.
 				.setDebugLevel(VirtualMachineConfig.DEBUG_LEVEL_FULL)
@@ -117,21 +126,11 @@ class AvfHypervisor(
 
 				override fun onPayloadReady(vm: VirtualMachine) {}
 
-				override fun onPayloadFinished(
-					vm: VirtualMachine,
-					exitCode: Int,
-				) {}
+				override fun onPayloadFinished(vm: VirtualMachine, exitCode: Int) {}
 
-				override fun onError(
-					vm: VirtualMachine,
-					errorCode: Int,
-					message: String,
-				) = events.onError(message)
+				override fun onError(vm: VirtualMachine, errorCode: Int, message: String) = events.onError(message)
 
-				override fun onStopped(
-					vm: VirtualMachine,
-					reason: Int,
-				) = events.onStopped(stopReason(reason))
+				override fun onStopped(vm: VirtualMachine, reason: Int) = events.onStopped(stopReason(reason))
 			},
 		)
 		machine.run()
@@ -192,9 +191,16 @@ class AvfHypervisor(
 			return connection
 		}
 
-		override fun listeningPorts(): List<Int>? = if (hasAgent) runCatching { Agent.ports(vsock(Agent.VSOCK_PORT)) }.getOrNull() else null
+		override fun listeningPorts(): List<Int>? = if (hasAgent) {
+			runCatching {
+				Agent.ports(vsock(Agent.VSOCK_PORT))
+			}.getOrNull()
+		} else {
+			null
+		}
 
-		override fun requestShutdown(): Boolean = hasAgent && runCatching { Agent.poweroff(vsock(Agent.VSOCK_PORT)) }.getOrDefault(false)
+		override fun requestShutdown(): Boolean =
+			hasAgent && runCatching { Agent.poweroff(vsock(Agent.VSOCK_PORT)) }.getOrDefault(false)
 
 		override fun forceStop() {
 			runCatching { machine.stop() }
@@ -202,15 +208,14 @@ class AvfHypervisor(
 		}
 	}
 
-	private fun stopReason(reason: Int): String? =
-		when (reason) {
-			VirtualMachineCallback.STOP_REASON_SHUTDOWN, VirtualMachineCallback.STOP_REASON_KILLED -> null
-			VirtualMachineCallback.STOP_REASON_REBOOT -> "The guest rebooted. Start it again to boot it."
-			VirtualMachineCallback.STOP_REASON_CRASH -> "The guest crashed."
-			VirtualMachineCallback.STOP_REASON_START_FAILED -> "AVF couldn't start the VM. Check its kernel and disks."
-			VirtualMachineCallback.STOP_REASON_VIRTUALIZATION_SERVICE_DIED -> "Android's virtualization service stopped."
-			VirtualMachineCallback.STOP_REASON_INFRASTRUCTURE_ERROR -> "AVF hit an internal error."
-			VirtualMachineCallback.STOP_REASON_HANGUP -> "The guest stopped responding."
-			else -> "The VM stopped (AVF reason $reason)."
-		}
+	private fun stopReason(reason: Int): String? = when (reason) {
+		VirtualMachineCallback.STOP_REASON_SHUTDOWN, VirtualMachineCallback.STOP_REASON_KILLED -> null
+		VirtualMachineCallback.STOP_REASON_REBOOT -> "The guest rebooted. Start it again to boot it."
+		VirtualMachineCallback.STOP_REASON_CRASH -> "The guest crashed."
+		VirtualMachineCallback.STOP_REASON_START_FAILED -> "AVF couldn't start the VM. Check its kernel and disks."
+		VirtualMachineCallback.STOP_REASON_VIRTUALIZATION_SERVICE_DIED -> "Android's virtualization service stopped."
+		VirtualMachineCallback.STOP_REASON_INFRASTRUCTURE_ERROR -> "AVF hit an internal error."
+		VirtualMachineCallback.STOP_REASON_HANGUP -> "The guest stopped responding."
+		else -> "The VM stopped (AVF reason $reason)."
+	}
 }

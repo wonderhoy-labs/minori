@@ -1,9 +1,9 @@
 package com.wonderhoylabs.rui.terminal
 
+import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import android.util.Log
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.concurrent.Executors
@@ -82,10 +82,7 @@ open class TerminalSession(
 		if (emulator.bracketedPaste) type("\u001b[200~$normalised\u001b[201~") else type(normalised)
 	}
 
-	fun resize(
-		rows: Int,
-		cols: Int,
-	) {
+	fun resize(rows: Int, cols: Int) {
 		if (rows == emulator.rows && cols == emulator.columns) return
 		emulator.resize(cols, rows)
 		revisions.value = emulator.revision

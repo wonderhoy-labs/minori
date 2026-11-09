@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -32,9 +33,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.wonderhoylabs.rui.BuildConfig
@@ -71,22 +71,15 @@ fun defaultMemoryMib(context: Context): Int {
 
 /** What the machine is made from. */
 private sealed interface Source {
-	data class FromTemplate(
-		val template: Template,
-	) : Source
+	data class FromTemplate(val template: Template) : Source
 
-	data class FromImage(
-		val image: ImageRecord,
-	) : Source
+	data class FromImage(val image: ImageRecord) : Source
 
 	data object Termux : Source
 }
 
 @Composable
-fun CreateScreen(
-	model: AppModel,
-	screen: Screen.Create,
-) {
+fun CreateScreen(model: AppModel, screen: Screen.Create) {
 	val context = LocalContext.current
 	val app = RuiApp.get(context)
 	val images by app.images.images.collectAsState()
@@ -137,10 +130,7 @@ fun CreateScreen(
 }
 
 @Composable
-private fun TemplateCard(
-	template: Template,
-	onClick: () -> Unit,
-) {
+private fun TemplateCard(template: Template, onClick: () -> Unit) {
 	val available = template.unavailable == null
 	Card(
 		modifier = Modifier.fillMaxWidth().then(if (available) Modifier.clickable(onClick = onClick) else Modifier),
@@ -152,17 +142,18 @@ private fun TemplateCard(
 				AssistChip(onClick = {}, label = { Text(template.kind.label) })
 			}
 			Text(template.description, style = MaterialTheme.typography.bodyMedium)
-			template.unavailable?.let { Text("Not available: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-			template.caveat?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+			template.unavailable?.let {
+				Text("Not available: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+			}
+			template.caveat?.let {
+				Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+			}
 		}
 	}
 }
 
 @Composable
-fun ImageCard(
-	image: ImageRecord,
-	onClick: (() -> Unit)?,
-) {
+fun ImageCard(image: ImageRecord, onClick: (() -> Unit)?) {
 	val report = image.report
 	Card(
 		modifier = Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
@@ -174,7 +165,15 @@ fun ImageCard(
 				listOfNotNull(
 					report?.format?.uppercase(),
 					report?.os,
-					report?.arch?.let { if (it == "aarch64") "64-bit Arm" else if (it == "x86_64") "x86-64" else "Unknown CPU" },
+					report?.arch?.let {
+						if (it == "aarch64") {
+							"64-bit Arm"
+						} else if (it == "x86_64") {
+							"x86-64"
+						} else {
+							"Unknown CPU"
+						}
+					},
 					"${image.size.gib()} file",
 					report?.virtualSize?.let { "${it.gib()} disk" },
 				).joinToString(" · "),
@@ -190,8 +189,11 @@ fun verdictText(image: ImageRecord): String {
 	val report = image.report ?: return "Not inspected"
 	return when (report.verdict) {
 		"bootable" -> "Bootable: ${report.boot?.description ?: "Linux"}"
+
 		"wrong_arch" -> "Won't run here: it's for x86-64 PCs, and a phone is 64-bit Arm. Look for an ARM64 or aarch64 image."
+
 		"windows" -> "Windows, which Rui can't boot."
+
 		else ->
 			if (report.format == "iso") {
 				"Rui found no installer kernel it knows on this ISO. It can still be attached to a VM as a read-only disk."
@@ -202,17 +204,15 @@ fun verdictText(image: ImageRecord): String {
 }
 
 @Composable
-private fun SettingsForm(
-	model: AppModel,
-	source: Source,
-	onBack: () -> Unit,
-) {
+private fun SettingsForm(model: AppModel, source: Source, onBack: () -> Unit) {
 	val context = LocalContext.current
 	val app = RuiApp.get(context)
 	val template = (source as? Source.FromTemplate)?.template
 	val image = (source as? Source.FromImage)?.image
 	val totalMib = remember { totalMemoryMib(context) }
-	var name by rememberSaveable { mutableStateOf(template?.name ?: image?.report?.os?.substringBefore(" GNU")?.trim() ?: "Linux") }
+	var name by rememberSaveable {
+		mutableStateOf(template?.name ?: image?.report?.os?.substringBefore(" GNU")?.trim() ?: "Linux")
+	}
 	var cpu by rememberSaveable { mutableStateOf(if (template?.cpusAll == false) CpuMode.ONE else CpuMode.MATCH_HOST) }
 	var memory by rememberSaveable { mutableStateOf((template?.memoryMib ?: defaultMemoryMib(context)).toString()) }
 	val minimumDisk = ((image?.report?.virtualSize ?: 0L) / Operations.GIB + 1).toInt()
@@ -230,11 +230,23 @@ private fun SettingsForm(
 	val cloudImage = template != null || (image?.report?.format != "iso" && image?.report?.bootable == true)
 	var firstBoot by rememberSaveable { mutableStateOf(cloudImage) }
 
-	SubScreen(title = template?.let { "New ${it.name} machine" } ?: if (source == Source.Termux) "New Termux userland" else "New machine", model = model) {
+	SubScreen(
+		title =
+			template?.let { "New ${it.name} machine" } ?: if (source ==
+				Source.Termux
+			) {
+				"New Termux userland"
+			} else {
+				"New machine"
+			},
+		model = model,
+	) {
 		image?.let { ImageCard(it, onClick = null) }
 		template?.let { Text(it.description) }
 		Section(title = "Machine") {
-			OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+			OutlinedTextField(value = name, onValueChange = {
+				name = it
+			}, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
 			if (source != Source.Termux) {
 				Text("Runs on", style = MaterialTheme.typography.labelLarge)
 				val backends = listOfNotNull(BackendKind.AVF, BackendKind.DEMO.takeIf { BuildConfig.DEBUG })
@@ -256,7 +268,9 @@ private fun SettingsForm(
 				}
 				Text("Virtual CPUs", style = MaterialTheme.typography.labelLarge)
 				SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-					SegmentedButton(selected = cpu == CpuMode.ONE, onClick = { cpu = CpuMode.ONE }, shape = SegmentedButtonDefaults.itemShape(0, 2)) {
+					SegmentedButton(selected = cpu == CpuMode.ONE, onClick = {
+						cpu = CpuMode.ONE
+					}, shape = SegmentedButtonDefaults.itemShape(0, 2)) {
 						Text("One")
 					}
 					SegmentedButton(
@@ -277,7 +291,10 @@ private fun SettingsForm(
 					singleLine = true,
 					keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
 					modifier = Modifier.fillMaxWidth(),
-					supportingText = { memoryWarning(memory.toLongOrNull() ?: 0, totalMib)?.let { Text(it) } ?: Text("This phone has ${totalMib / 1024} GiB.") },
+					supportingText = {
+						memoryWarning(memory.toLongOrNull() ?: 0, totalMib)?.let { Text(it) }
+							?: Text("This phone has ${totalMib / 1024} GiB.")
+					},
 					isError = memoryWarning(memory.toLongOrNull() ?: 0, totalMib) != null,
 				)
 				OutlinedTextField(
@@ -294,7 +311,13 @@ private fun SettingsForm(
 		if (source == Source.Termux) {
 			Section(title = "Distribution") {
 				for (option in TermuxHypervisor.DISTROS) {
-					Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { distro = option.id }) {
+					Row(
+						verticalAlignment = Alignment.CenterVertically,
+						modifier = Modifier.fillMaxWidth().clickable {
+							distro =
+								option.id
+						},
+					) {
 						androidx.compose.material3.RadioButton(selected = distro == option.id, onClick = { distro = option.id })
 						Text(option.name)
 					}
@@ -307,16 +330,19 @@ private fun SettingsForm(
 			Section(title = "First boot") {
 				if (cloudImage) {
 					Row(
-							verticalAlignment = Alignment.CenterVertically,
-							modifier = Modifier.toggleable(value = firstBoot, role = Role.Checkbox, onValueChange = { firstBoot = it }),
-						) {
+						verticalAlignment = Alignment.CenterVertically,
+						modifier = Modifier.toggleable(firstBoot, role = Role.Checkbox) { firstBoot = it },
+					) {
 						Checkbox(checked = firstBoot, onCheckedChange = null)
 						Text("Set up a user, SSH and Rui's guest agent with cloud-init")
 					}
 				}
 				if (firstBoot || source == Source.Termux) {
 					if (source != Source.Termux) {
-						OutlinedTextField(value = user, onValueChange = { user = it.lowercase().filter { c -> c.isLetterOrDigit() || c == '-' || c == '_' } }, label = { Text("User") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+						OutlinedTextField(value = user, onValueChange = {
+							user =
+								it.lowercase().filter { c -> c.isLetterOrDigit() || c == '-' || c == '_' }
+						}, label = { Text("User") }, singleLine = true, modifier = Modifier.fillMaxWidth())
 					}
 					Text(if (source == Source.Termux) "root's password" else "Password", style = MaterialTheme.typography.labelLarge)
 					CommandBox(password)
@@ -351,21 +377,33 @@ private fun SettingsForm(
 				when (source) {
 					Source.Termux ->
 						model.run("Making $name", { _ ->
-							val vm = VmConfig(name = name, backend = BackendKind.TERMUX, distro = distro, access = AccessSettings(user = "root", password = password))
+							val vm =
+								VmConfig(
+									name = name,
+									backend = BackendKind.TERMUX,
+									distro = distro,
+									access = AccessSettings(user = "root", password = password),
+								)
 							app.vms.save(vm)
 							vm
 						}) { model.replace(Screen.Detail(it.id)) }
+
 					is Source.FromImage ->
 						model.run("Making $name", { job ->
 							app.operations.createFromImage(name, source.image, backend, cpu, memoryMib, diskGib, boot, job)
 						}) { model.replace(Screen.Detail(it.id)) }
+
 					is Source.FromTemplate -> {
 						val base = source.template.baseImage ?: return@Button
 						model.run("Making $name", { job ->
 							val fetched = Catalog.fetch(base, app.images, job)
-							val vm = app.operations.createFromImage(name, fetched, backend, cpu, memoryMib, diskGib, boot, job, template = source.template.id)
+							val vm =
+								app.operations.createFromImage(
+									name, fetched, backend, cpu, memoryMib, diskGib, boot, job, template = source.template.id,
+								)
 							source.template.vncPort?.let { port ->
-								app.vms.update(vm.id) { it.copy(access = it.access.copy(vncPort = port, vncPassword = password.take(8))) }
+								val vnc = { access: AccessSettings -> access.copy(vncPort = port, vncPassword = password.take(8)) }
+								app.vms.update(vm.id) { it.copy(access = vnc(it.access)) }
 							} ?: vm
 						}) { model.replace(Screen.Detail(it.id)) }
 					}
@@ -375,13 +413,9 @@ private fun SettingsForm(
 	}
 }
 
-fun memoryWarning(
-	mib: Long,
-	totalMib: Long,
-): String? =
-	when {
-		mib < 256 -> "Linux needs at least 256 MiB."
-		mib > totalMib * 3 / 4 -> "That's more than this phone can spare. Android will stop apps, or the VM, to find it."
-		mib > totalMib / 2 -> "That's over half of this phone's memory. Other apps may be closed while it runs."
-		else -> null
-	}
+fun memoryWarning(mib: Long, totalMib: Long): String? = when {
+	mib < 256 -> "Linux needs at least 256 MiB."
+	mib > totalMib * 3 / 4 -> "That's more than this phone can spare. Android will stop apps, or the VM, to find it."
+	mib > totalMib / 2 -> "That's over half of this phone's memory. Other apps may be closed while it runs."
+	else -> null
+}

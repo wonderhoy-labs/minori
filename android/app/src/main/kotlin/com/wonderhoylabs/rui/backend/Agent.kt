@@ -13,10 +13,7 @@ object Agent {
 	const val VSOCK_PORT = 5741L
 
 	/** Turns a fresh connection to the agent into a connection to [guestPort] in the guest. */
-	fun connect(
-		agent: GuestConnection,
-		guestPort: Int,
-	): GuestConnection {
+	fun connect(agent: GuestConnection, guestPort: Int): GuestConnection {
 		try {
 			request(agent, "CONNECT $guestPort")
 		} catch (error: IOException) {
@@ -28,24 +25,20 @@ object Agent {
 
 	fun hello(agent: GuestConnection): String = agent.use { request(it, "HELLO") }
 
-	fun ports(agent: GuestConnection): List<Int> =
-		agent.use { connection ->
-			val reply = request(connection, "PORTS")
-			reply
-				.trim()
-				.removePrefix("[")
-				.removeSuffix("]")
-				.split(",")
-				.mapNotNull { it.trim().toIntOrNull() }
-		}
+	fun ports(agent: GuestConnection): List<Int> = agent.use { connection ->
+		val reply = request(connection, "PORTS")
+		reply
+			.trim()
+			.removePrefix("[")
+			.removeSuffix("]")
+			.split(",")
+			.mapNotNull { it.trim().toIntOrNull() }
+	}
 
 	fun poweroff(agent: GuestConnection): Boolean = agent.use { runCatching { request(it, "POWEROFF") }.isSuccess }
 
 	/** Sends one request line and returns what follows "OK", or throws with the agent's reason. */
-	fun request(
-		agent: GuestConnection,
-		line: String,
-	): String {
+	fun request(agent: GuestConnection, line: String): String {
 		agent.output.write("$line\n".toByteArray())
 		agent.output.flush()
 		val reply = readLine(agent.input) ?: throw IOException("The guest's agent closed the connection")
@@ -62,8 +55,8 @@ object Agent {
 		val line = ByteArrayOutputStream()
 		while (line.size() < 1024) {
 			val byte = input.read()
-			if (byte < 0) return if (line.size() == 0) null else line.toString(Charsets.UTF_8)
-			if (byte == '\n'.code) return line.toString(Charsets.UTF_8)
+			if (byte < 0) return if (line.size() == 0) null else String(line.toByteArray(), Charsets.UTF_8)
+			if (byte == '\n'.code) return String(line.toByteArray(), Charsets.UTF_8)
 			line.write(byte)
 		}
 		throw IOException("The guest's agent sent a line that was too long")

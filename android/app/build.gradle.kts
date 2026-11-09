@@ -108,10 +108,17 @@ val buildAgent =
 	}
 
 tasks.configureEach {
-	if (name.startsWith("merge") && name.endsWith("JniLibFolders")) dependsOn(buildRust)
-	if (name.startsWith("merge") && name.endsWith("Assets")) dependsOn(buildAgent)
-	if (name.startsWith("generate") && name.endsWith("LintModel")) dependsOn(buildAgent)
-	if (name.startsWith("lintAnalyze")) dependsOn(buildAgent)
+	// Lint reads the generated assets and libraries too, so its tasks wait for them as packaging does.
+	if ((name.startsWith("merge") && name.endsWith("JniLibFolders")) ||
+		name.contains("lint", ignoreCase = true)
+	) {
+		dependsOn(buildRust)
+	}
+	if ((name.startsWith("merge") && name.endsWith("Assets")) ||
+		name.contains("lint", ignoreCase = true)
+	) {
+		dependsOn(buildAgent)
+	}
 }
 
 dependencies {

@@ -8,9 +8,7 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 
 class AgentTest {
-	private class Fake(
-		reply: String,
-	) : GuestConnection {
+	private class Fake(reply: String) : GuestConnection {
 		override val input = ByteArrayInputStream(reply.toByteArray())
 		override val output = ByteArrayOutputStream()
 

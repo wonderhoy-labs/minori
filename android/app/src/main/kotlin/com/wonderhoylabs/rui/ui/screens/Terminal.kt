@@ -61,7 +61,9 @@ private fun TerminalFrame(
 	Column(modifier = Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
 		TopAppBar(
 			title = { Text(title) },
-			navigationIcon = { IconButton(onClick = { model.back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
+			navigationIcon = {
+				IconButton(onClick = { model.back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+			},
 			actions = {
 				if (session != null) {
 					IconButton(onClick = { clipboard.getText()?.text?.let { session.paste(it) } }) {
@@ -76,6 +78,7 @@ private fun TerminalFrame(
 				ended?.let { TerminalEnded(it) { model.back() } }
 				TerminalView(session, modifier = Modifier.weight(1f).fillMaxWidth())
 			}
+
 			else ->
 				Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
 					TerminalMeasure(modifier = Modifier.fillMaxSize(), onMeasured = onMeasured)
@@ -90,10 +93,7 @@ private fun TerminalFrame(
 
 /** The VM's serial console, as Android's Terminal app shows it, but kept open while the VM runs. */
 @Composable
-fun ConsoleScreen(
-	model: AppModel,
-	vmId: String,
-) {
+fun ConsoleScreen(model: AppModel, vmId: String) {
 	val app = RuiApp.get(LocalContext.current)
 	val vm = app.vms.get(vmId)
 	val session = app.machines.console(vmId)
@@ -107,10 +107,7 @@ fun ConsoleScreen(
 
 /** SSH into the guest through Rui's own connection to it, so no port has to be published. */
 @Composable
-fun SshScreen(
-	model: AppModel,
-	vmId: String,
-) {
+fun SshScreen(model: AppModel, vmId: String) {
 	val app = RuiApp.get(LocalContext.current)
 	val vm = app.vms.get(vmId) ?: return
 	var session by remember { mutableStateOf<TerminalSession?>(null) }
@@ -147,7 +144,10 @@ fun SshScreen(
 			}
 	}
 	DisposableEffect(vmId) { onDispose { session?.close() } }
-	TerminalFrame(title = "${vm.name} over SSH", model = model, session = session, status = status, onMeasured = { measured = true })
+	TerminalFrame(title = "${vm.name} over SSH", model = model, session = session, status = status, onMeasured = {
+		measured =
+			true
+	})
 	hostKey?.let { (message, answer) ->
 		AlertDialog(
 			onDismissRequest = { answer.complete(false) },

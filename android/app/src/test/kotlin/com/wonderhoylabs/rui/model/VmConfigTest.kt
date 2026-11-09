@@ -11,7 +11,9 @@ class VmConfigTest {
 			VmConfig(
 				name = "Debian",
 				disks = listOf(VmDisk(file = "root.img", label = "System disk", role = DiskRole.ROOT)),
-				network = NetworkSettings(forwards = listOf(PortForward(hostPort = 2222, guestPort = 22, deny = listOf("10.0.0.0/8")))),
+				network = NetworkSettings(
+					forwards = listOf(PortForward(hostPort = 2222, guestPort = 22, deny = listOf("10.0.0.0/8"))),
+				),
 			)
 		val json = RuiJson.encodeToString(VmConfig.serializer(), vm)
 		assertEquals(vm, RuiJson.decodeFromString(VmConfig.serializer(), json))
