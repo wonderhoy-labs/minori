@@ -11,6 +11,13 @@ dependencyResolutionManagement {
 	repositories {
 		google()
 		mavenCentral()
+		// Wonderhoy Labs libraries, straight from each project's GitHub releases.
+		ivy {
+			url = uri("https://github.com/wonderhoy-labs")
+			patternLayout { artifact("[organisation]/releases/download/v[revision]/[organisation]-[module]-[revision].[ext]") }
+			metadataSources { artifact() }
+			content { includeGroup("airi") }
+		}
 	}
 }
 

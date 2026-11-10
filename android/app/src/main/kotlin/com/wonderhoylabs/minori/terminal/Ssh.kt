@@ -1,9 +1,11 @@
 package com.wonderhoylabs.minori.terminal
 
+import com.jcraft.jsch.ChannelExec
 import com.jcraft.jsch.ChannelShell
 import com.jcraft.jsch.JSch
 import com.jcraft.jsch.KeyPair
 import com.jcraft.jsch.Proxy
+import com.jcraft.jsch.Session
 import com.jcraft.jsch.SocketFactory
 import com.jcraft.jsch.UIKeyboardInteractive
 import com.jcraft.jsch.UserInfo
@@ -27,6 +29,7 @@ data class SshKey(val privateKey: String, val publicKey: String)
 
 object Ssh {
 	private const val CONNECT_TIMEOUT_MS = 20_000
+	private const val POLL_MS = 50L
 
 	/** Makes an RSA key for logging in to a new VM. RSA works on every Android version without extra providers. */
 	fun generateKey(comment: String): SshKey {
@@ -58,6 +61,67 @@ object Ssh {
 		rows: Int = TerminalSize.rows,
 		cols: Int = TerminalSize.cols,
 	): ShellChannel {
+		val session = session(hostAlias, user, password, privateKey, knownHosts, open, confirmHostKey)
+		val channel = session.openChannel("shell") as ChannelShell
+		channel.setPtyType("xterm-256color")
+		channel.setPtySize(cols, rows, 0, 0)
+		val output = channel.inputStream
+		val input = channel.outputStream
+		channel.connect(CONNECT_TIMEOUT_MS)
+		return ShellChannel(output, input, { r, c -> channel.setPtySize(c, r, 0, 0) }) {
+			channel.disconnect()
+			session.disconnect()
+		}
+	}
+
+	/** What a command run over SSH printed, and how it ended. */
+	data class Result(val exitCode: Int, val output: String)
+
+	/**
+	 * Logs in like [channel] and runs one command without a terminal, giving it [stdin] as its input. Returns its exit
+	 * code and what it printed, stdout and stderr together. Blocks; call on a background thread.
+	 */
+	fun run(
+		hostAlias: String,
+		user: String,
+		password: String?,
+		privateKey: String?,
+		knownHosts: File,
+		open: () -> GuestConnection,
+		confirmHostKey: (message: String) -> Boolean,
+		command: String,
+		stdin: ByteArray? = null,
+	): Result {
+		val session = session(hostAlias, user, password, privateKey, knownHosts, open, confirmHostKey)
+		try {
+			val channel = session.openChannel("exec") as ChannelExec
+			channel.setCommand(command)
+			val output = ByteArrayOutputStream()
+			channel.outputStream.let { input ->
+				val printed = channel.inputStream
+				channel.setErrStream(output, true)
+				channel.connect(CONNECT_TIMEOUT_MS)
+				stdin?.let { input.write(it) }
+				input.close()
+				printed.copyTo(output)
+			}
+			while (!channel.isClosed) Thread.sleep(POLL_MS)
+			channel.disconnect()
+			return Result(channel.exitStatus, String(output.toByteArray(), Charsets.UTF_8))
+		} finally {
+			session.disconnect()
+		}
+	}
+
+	private fun session(
+		hostAlias: String,
+		user: String,
+		password: String?,
+		privateKey: String?,
+		knownHosts: File,
+		open: () -> GuestConnection,
+		confirmHostKey: (message: String) -> Boolean,
+	): Session {
 		knownHosts.parentFile?.mkdirs()
 		if (!knownHosts.exists()) knownHosts.createNewFile()
 		val jsch = JSch()
@@ -70,16 +134,7 @@ object Ssh {
 		session.setConfig("PreferredAuthentications", "publickey,keyboard-interactive,password")
 		session.userInfo = Prompts(password, confirmHostKey)
 		session.connect(CONNECT_TIMEOUT_MS)
-		val channel = session.openChannel("shell") as ChannelShell
-		channel.setPtyType("xterm-256color")
-		channel.setPtySize(cols, rows, 0, 0)
-		val output = channel.inputStream
-		val input = channel.outputStream
-		channel.connect(CONNECT_TIMEOUT_MS)
-		return ShellChannel(output, input, { r, c -> channel.setPtySize(c, r, 0, 0) }) {
-			channel.disconnect()
-			session.disconnect()
-		}
+		return session
 	}
 
 	/** [channel] as a terminal. */
