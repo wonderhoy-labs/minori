@@ -106,6 +106,8 @@ fun SettingsTab(model: AppModel) {
 				FilledTonalButton(onClick = {
 					termuxPermission.launch(TermuxHypervisor.RUN_COMMAND_PERMISSION)
 				}) { Text("Allow Minori to use Termux") }
+			} else if (termux == Availability.Ready) {
+				OutlinedButton(onClick = { checkTermux(model, app) }) { Text("Check Termux") }
 			}
 		}
 		Panel(title = "Notifications") {
@@ -158,6 +160,14 @@ fun SettingsTab(model: AppModel) {
 				Text("  Source code")
 			}
 		}
+	}
+}
+
+/** Asks Termux to run `true`, and says whether it did or what's stopping it. */
+fun checkTermux(model: AppModel, app: MinoriApp) {
+	val termux = app.machines.backend(BackendKind.TERMUX) as? TermuxHypervisor ?: return
+	model.run("Checking Termux", { termux.check() }) { problem ->
+		model.message.value = problem ?: "Termux runs Minori's commands. You're ready to make a Termux machine."
 	}
 }
 

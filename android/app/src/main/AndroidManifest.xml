@@ -75,6 +75,11 @@
 				android:value="Runs the virtual machines the user started, which live in this app's process." />
 		</service>
 
+		<!-- Termux's answers to RUN_COMMAND come back through a PendingIntent Minori made, so this needn't be exported. -->
+		<receiver
+			android:name=".backend.TermuxResultReceiver"
+			android:exported="false" />
+
 		<receiver
 			android:name=".service.BootReceiver"
 			android:exported="false">

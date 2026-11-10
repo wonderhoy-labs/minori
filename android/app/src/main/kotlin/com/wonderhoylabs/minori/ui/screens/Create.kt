@@ -2,6 +2,9 @@ package com.wonderhoylabs.minori.ui.screens
 
 import android.app.ActivityManager
 import android.content.Context
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,6 +16,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -117,6 +121,10 @@ fun CreateScreen(model: AppModel, screen: Screen.Create) {
 	val cloudImage = template != null || (image?.report?.format != "iso" && image?.report?.bootable == true)
 	var firstBoot by rememberSaveable { mutableStateOf(cloudImage) }
 	val warning = memoryWarning(memory.toLong(), totalMib)
+	val termuxPermission =
+		rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+			if (granted) checkTermux(model, app)
+		}
 
 	SubScreen(title = "New machine", model = model) {
 		SourceHeader(template, image, termux)
@@ -248,6 +256,13 @@ fun CreateScreen(model: AppModel, screen: Screen.Create) {
 			Panel(title = "Before you start") {
 				Text("Termux has to let Minori run commands. In Termux, run:", style = MaterialTheme.typography.bodyMedium)
 				CommandBox("mkdir -p ~/.termux && echo 'allow-external-apps = true' >> ~/.termux/termux.properties")
+				FilledTonalButton(onClick = {
+					if (context.checkSelfPermission(TermuxHypervisor.RUN_COMMAND_PERMISSION) == PackageManager.PERMISSION_GRANTED) {
+						checkTermux(model, app)
+					} else {
+						termuxPermission.launch(TermuxHypervisor.RUN_COMMAND_PERMISSION)
+					}
+				}) { Text("Check Termux") }
 			}
 		}
 		Button(

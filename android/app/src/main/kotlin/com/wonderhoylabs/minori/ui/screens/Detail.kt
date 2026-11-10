@@ -71,6 +71,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.wonderhoylabs.minori.MinoriApp
+import com.wonderhoylabs.minori.backend.TermuxHypervisor
 import com.wonderhoylabs.minori.model.BackendKind
 import com.wonderhoylabs.minori.model.CpuMode
 import com.wonderhoylabs.minori.model.Exposure
@@ -215,6 +216,10 @@ fun DetailScreen(model: AppModel, vmId: String) {
 		if (vm.backend != BackendKind.TERMUX) PortsPanel(vm, running, listening, onEdit = { editPort = it })
 		Panel(title = "Machine") {
 			InfoRow(Icons.Rounded.Memory, "Runs as", backendLabel(vm.backend))
+			if (vm.backend == BackendKind.TERMUX) {
+				val distro = TermuxHypervisor.DISTROS.firstOrNull { it.id == vm.distro }?.name ?: vm.distro ?: "Linux"
+				InfoRow(Icons.Rounded.Storage, "Distribution", "$distro, with proot")
+			}
 			if (vm.backend != BackendKind.TERMUX) {
 				InfoRow(
 					Icons.Rounded.Memory,
@@ -459,7 +464,7 @@ private fun LoginPanel(model: AppModel, vm: VmConfig, running: Boolean, desktop:
 						}
 					}) {
 						Icon(Icons.AutoMirrored.Rounded.ScreenShare, contentDescription = null, modifier = Modifier.size(18.dp))
-						Text("  Remote Desktop app")
+						Text("  RDP app")
 					}
 				}
 			}

@@ -1,8 +1,11 @@
 package com.wonderhoylabs.minori.backend
 
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Bundle
 import com.wonderhoylabs.minori.model.BackendKind
 import com.wonderhoylabs.minori.model.VmConfig
 import com.wonderhoylabs.minori.terminal.Ssh
@@ -11,6 +14,10 @@ import java.io.IOException
 import java.io.InputStream
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 /** A Linux userland Termux's proot-distro can install, and how to put an SSH server in it. */
 data class TermuxDistro(val id: String, val name: String, val installSsh: String)
@@ -45,9 +52,12 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 		val password = vm.access.password ?: throw IOException("This machine has no password set.")
 		val port = port(vm)
 		val firstRun = !File(dir, SET_UP_MARKER).exists()
-		run(script(distro, port, password), background = !firstRun)
+		// Termux answers through a PendingIntent when it refuses a command or the command ends. sshd -D doesn't end,
+		// so any answer before the port opens means something went wrong, and it says what.
+		val ended = run(script(distro, port, password), background = !firstRun)
 		val deadline = System.currentTimeMillis() + if (firstRun) SETUP_TIMEOUT_MS else START_TIMEOUT_MS
 		while (!listening(port)) {
+			ended.getNow(null)?.let { throw IOException(it.explain(distro)) }
 			if (System.currentTimeMillis() > deadline) {
 				throw IOException(
 					if (firstRun) {
@@ -114,7 +124,33 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 			"proot-distro login ${distro.id} -- sh -c \"$inside\""
 	}
 
-	private fun run(script: String, background: Boolean) {
+	/**
+	 * Checks that Termux will run Minori's commands at all, by running `true`. Returns null when it does, or what
+	 * the user has to do.
+	 */
+	fun check(): String? {
+		val result =
+			try {
+				run("true", background = true).get(CHECK_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+			} catch (error: IOException) {
+				return error.message
+			} catch (_: java.util.concurrent.TimeoutException) {
+				return "Termux didn't answer. Open Termux once so it can finish installing, then try again."
+			}
+		return if (result.ok) null else result.explain(null)
+	}
+
+	private fun run(script: String, background: Boolean): CompletableFuture<TermuxResult> {
+		val id = nextId.incrementAndGet()
+		val answer = CompletableFuture<TermuxResult>()
+		pending[id] = answer
+		val reply =
+			PendingIntent.getBroadcast(
+				context,
+				id,
+				Intent(context, TermuxResultReceiver::class.java).putExtra(TermuxResultReceiver.EXTRA_ID, id),
+				PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_MUTABLE,
+			)
 		val intent =
 			Intent()
 				.setClassName(TERMUX, "com.termux.app.RunCommandService")
@@ -124,14 +160,25 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 				.putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home")
 				.putExtra("com.termux.RUN_COMMAND_BACKGROUND", background)
 				.putExtra("com.termux.RUN_COMMAND_SESSION_ACTION", "0")
+				.putExtra("com.termux.RUN_COMMAND_PENDING_INTENT", reply)
 		try {
 			context.startForegroundService(intent)
 		} catch (error: SecurityException) {
-			throw IOException("Termux refused. Set allow-external-apps = true in ~/.termux/termux.properties.", error)
+			pending.remove(id)
+			throw IOException("Android didn't let Minori use Termux. Allow it in Settings, then try again.", error)
 		}
+		return answer
 	}
 
 	companion object {
+		private val nextId = AtomicInteger((System.currentTimeMillis() % 100_000).toInt())
+		private val pending = ConcurrentHashMap<Int, CompletableFuture<TermuxResult>>()
+
+		/** Hands Termux's answer to whoever is waiting for it. */
+		internal fun deliver(id: Int, result: TermuxResult) {
+			pending.remove(id)?.complete(result)
+		}
+
 		const val TERMUX = "com.termux"
 		const val RUN_COMMAND_PERMISSION = "com.termux.permission.RUN_COMMAND"
 		private const val PORT_BASE = 20000
@@ -140,6 +187,7 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 		private const val START_TIMEOUT_MS = 30_000L
 		private const val SETUP_TIMEOUT_MS = 15 * 60_000L
 		private const val SET_UP_MARKER = "termux-set-up"
+		private const val CHECK_TIMEOUT_MS = 8_000L
 
 		val DISTROS =
 			listOf(
@@ -157,5 +205,60 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 				TermuxDistro("alpine", "Alpine", "(command -v sshd >/dev/null || apk add openssh)"),
 				TermuxDistro("fedora", "Fedora", "(command -v sshd >/dev/null || dnf install -y openssh-server)"),
 			)
+	}
+}
+
+/** What Termux said about a command: refused, or ended with an exit code and what it printed. */
+data class TermuxResult(
+	val err: Int,
+	val errmsg: String?,
+	val exitCode: Int?,
+	val stdout: String,
+	val stderr: String,
+) {
+	/** Termux's own code for "no error" is -1. */
+	val ok: Boolean get() = (err == -1 || err == 0) && (exitCode ?: 0) == 0
+
+	fun explain(distro: TermuxDistro?): String {
+		val message = errmsg.orEmpty()
+		return when {
+			"allow-external-apps" in message ->
+				"Termux doesn't let other apps run commands yet. In Termux, run: mkdir -p ~/.termux && " +
+					"echo 'allow-external-apps = true' >> ~/.termux/termux.properties"
+
+			err != -1 && err != 0 && message.isNotBlank() -> "Termux refused: ${message.lines().first()}"
+
+			else -> {
+				val output = (stderr.ifBlank { stdout }).trim().lines().takeLast(4).joinToString("\n")
+				val what = distro?.let { "Setting up ${it.name} in Termux" } ?: "The command in Termux"
+				"$what stopped (exit code ${exitCode ?: "unknown"})." + if (output.isNotEmpty()) "\n$output" else ""
+			}
+		}
+	}
+
+	companion object {
+		fun from(bundle: Bundle?): TermuxResult = TermuxResult(
+			err = bundle?.getInt("err", -1) ?: -1,
+			errmsg = bundle?.getString("errmsg"),
+			exitCode = bundle?.takeIf { it.containsKey("exitCode") }?.getInt("exitCode"),
+			stdout = bundle?.getString("stdout").orEmpty(),
+			stderr = bundle?.getString("stderr").orEmpty(),
+		)
+	}
+}
+
+/** Receives Termux's answers to RUN_COMMAND, which it sends through the PendingIntent Minori gave it. */
+class TermuxResultReceiver : BroadcastReceiver() {
+	override fun onReceive(context: Context, intent: Intent) {
+		val extras = intent.extras ?: return
+
+		// Termux puts the result in a Bundle extra; its key has changed between versions, so take the Bundle.
+		@Suppress("DEPRECATION")
+		val bundle = extras.keySet().firstNotNullOfOrNull { extras.get(it) as? Bundle }
+		TermuxHypervisor.deliver(intent.getIntExtra(EXTRA_ID, -1), TermuxResult.from(bundle))
+	}
+
+	companion object {
+		const val EXTRA_ID = "minori.termux.request"
 	}
 }
