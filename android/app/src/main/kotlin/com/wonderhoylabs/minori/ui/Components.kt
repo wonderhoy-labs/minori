@@ -127,7 +127,7 @@ fun StoreIconTile(icon: StoreIcon, modifier: Modifier = Modifier, size: Dp = 52.
 	val logo = logo(icon)
 	if (logo != null) {
 		Box(modifier = modifier.size(size).clip(shape).background(Color.White), contentAlignment = Alignment.Center) {
-			Image(painterResource(logo), contentDescription = null, modifier = Modifier.size(size * 0.62f))
+			Image(painterResource(logo), contentDescription = null, modifier = Modifier.size(size * 0.68f))
 		}
 		return
 	}
