@@ -10,6 +10,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -35,13 +36,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.ContentCopy
-import androidx.compose.material.icons.rounded.Cyclone
-import androidx.compose.material.icons.rounded.DesktopWindows
-import androidx.compose.material.icons.rounded.Hub
-import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.Terminal
-import androidx.compose.material.icons.rounded.Token
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -67,14 +63,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.drawable.toBitmap
+import com.wonderhoylabs.minori.R
+import com.wonderhoylabs.minori.backend.TermuxHypervisor
 import com.wonderhoylabs.minori.model.BackendKind
 import com.wonderhoylabs.minori.model.VmConfig
 import com.wonderhoylabs.minori.model.VmState
@@ -106,19 +107,46 @@ fun IconTile(icon: ImageVector, colors: TileColors, modifier: Modifier = Modifie
 	}
 }
 
-fun storeIcon(icon: StoreIcon): ImageVector = when (icon) {
-	StoreIcon.Debian -> Icons.Rounded.Cyclone
-	StoreIcon.Ubuntu -> Icons.Rounded.Hub
-	StoreIcon.Fedora -> Icons.Rounded.Token
-	StoreIcon.Desktop -> Icons.Rounded.DesktopWindows
-	StoreIcon.Browser -> Icons.Rounded.Public
-	StoreIcon.Terminal -> Icons.Rounded.Terminal
+/** The project's own logo for a store item, or null where Minori has none and shows a symbol instead. */
+private fun logo(icon: StoreIcon): Int? = when (icon) {
+	StoreIcon.Debian -> R.drawable.logo_debian
+	StoreIcon.Ubuntu -> R.drawable.logo_ubuntu
+	StoreIcon.Fedora -> R.drawable.logo_fedora
+	StoreIcon.Kde -> R.drawable.logo_kde
+	StoreIcon.Chromium -> R.drawable.logo_chromium
+	StoreIcon.Termux, StoreIcon.Linux -> null
 }
 
-fun storeTile(icon: StoreIcon): Int = when (icon) {
-	StoreIcon.Debian, StoreIcon.Desktop -> 0
-	StoreIcon.Ubuntu, StoreIcon.Browser -> 1
-	else -> 2
+/**
+ * A store item's or machine's icon: the project's real logo on a white tile, as app stores show icons. Termux shows
+ * the installed Termux app's own icon. Anything else gets a terminal symbol.
+ */
+@Composable
+fun StoreIconTile(icon: StoreIcon, modifier: Modifier = Modifier, size: Dp = 52.dp) {
+	val shape = RoundedCornerShape(size * 0.3f)
+	val logo = logo(icon)
+	if (logo != null) {
+		Box(modifier = modifier.size(size).clip(shape).background(Color.White), contentAlignment = Alignment.Center) {
+			Image(painterResource(logo), contentDescription = null, modifier = Modifier.size(size * 0.62f))
+		}
+		return
+	}
+	val context = LocalContext.current
+	val appIcon =
+		remember(icon) {
+			if (icon != StoreIcon.Termux) {
+				null
+			} else {
+				runCatching {
+					context.packageManager.getApplicationIcon(TermuxHypervisor.TERMUX).toBitmap(192, 192).asImageBitmap()
+				}.getOrNull()
+			}
+		}
+	if (appIcon != null) {
+		Image(appIcon, contentDescription = null, modifier = modifier.size(size).clip(shape))
+	} else {
+		IconTile(Icons.Rounded.Terminal, tileColors(2), modifier, size)
+	}
 }
 
 /** The icon a machine shows: its template's, or one guessed from its OS. */
@@ -126,18 +154,17 @@ fun machineIcon(vm: VmConfig): StoreIcon {
 	Catalog.template(vm.template)?.let { return it.icon }
 	val os = (vm.os ?: vm.distro ?: "").lowercase()
 	return when {
-		vm.backend == BackendKind.TERMUX -> StoreIcon.Terminal
+		vm.backend == BackendKind.TERMUX -> StoreIcon.Termux
 		"ubuntu" in os -> StoreIcon.Ubuntu
 		"fedora" in os -> StoreIcon.Fedora
 		"debian" in os -> StoreIcon.Debian
-		else -> StoreIcon.Terminal
+		else -> StoreIcon.Linux
 	}
 }
 
 @Composable
 fun MachineTile(vm: VmConfig, size: Dp = 52.dp) {
-	val icon = machineIcon(vm)
-	IconTile(storeIcon(icon), tileColors(storeTile(icon)), size = size)
+	StoreIconTile(machineIcon(vm), size = size)
 }
 
 @Composable

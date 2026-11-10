@@ -7,6 +7,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -63,7 +64,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
@@ -338,19 +338,17 @@ fun DetailScreen(model: AppModel, vmId: String) {
 private fun Hero(vm: VmConfig, state: VmState, onStart: () -> Unit, onStop: () -> Unit, onForce: () -> Unit) {
 	val scheme = MaterialTheme.colorScheme
 	val running = state == VmState.Running || state == VmState.Starting
-	val colors =
-		if (running) {
-			listOf(scheme.tertiaryContainer, scheme.primaryContainer)
-		} else {
-			listOf(scheme.surfaceContainerHigh, scheme.surfaceContainer)
-		}
-	Card(shape = RoundedCornerShape(28.dp), modifier = Modifier.fillMaxWidth()) {
-		Column(
-			Modifier
-				.background(Brush.linearGradient(colors))
-				.padding(22.dp),
-			verticalArrangement = Arrangement.spacedBy(16.dp),
-		) {
+	// One flat colour that warms up while the machine runs.
+	val container by animateColorAsState(
+		if (running) scheme.primaryContainer else scheme.surfaceContainerHigh,
+		label = "hero",
+	)
+	Card(
+		shape = RoundedCornerShape(28.dp),
+		colors = CardDefaults.cardColors(containerColor = container),
+		modifier = Modifier.fillMaxWidth(),
+	) {
+		Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
 			Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
 				MachineTile(vm, size = 64.dp)
 				Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {

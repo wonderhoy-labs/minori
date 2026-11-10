@@ -52,6 +52,7 @@ import com.wonderhoylabs.minori.model.VmConfig
 import com.wonderhoylabs.minori.service.Catalog
 import com.wonderhoylabs.minori.service.FirstBoot
 import com.wonderhoylabs.minori.service.Operations
+import com.wonderhoylabs.minori.service.StoreIcon
 import com.wonderhoylabs.minori.service.Template
 import com.wonderhoylabs.minori.ui.AppModel
 import com.wonderhoylabs.minori.ui.CommandBox
@@ -59,9 +60,8 @@ import com.wonderhoylabs.minori.ui.IconTile
 import com.wonderhoylabs.minori.ui.ImageTile
 import com.wonderhoylabs.minori.ui.Panel
 import com.wonderhoylabs.minori.ui.Screen
+import com.wonderhoylabs.minori.ui.StoreIconTile
 import com.wonderhoylabs.minori.ui.SubScreen
-import com.wonderhoylabs.minori.ui.storeIcon
-import com.wonderhoylabs.minori.ui.storeTile
 import com.wonderhoylabs.minori.ui.tileColors
 
 fun totalMemoryMib(context: Context): Long {
@@ -324,9 +324,9 @@ fun CreateScreen(model: AppModel, screen: Screen.Create) {
 private fun SourceHeader(template: Template?, image: ImageRecord?, termux: Boolean) {
 	Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
 		when {
-			template != null -> IconTile(storeIcon(template.icon), tileColors(storeTile(template.icon)), size = 64.dp)
+			template != null -> StoreIconTile(template.icon, size = 64.dp)
 			image != null -> ImageTile(image.report?.format == "iso")
-			else -> IconTile(Icons.Rounded.Terminal, tileColors(2), size = 64.dp)
+			else -> StoreIconTile(StoreIcon.Termux, size = 64.dp)
 		}
 		Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
 			Text(

@@ -52,7 +52,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,6 +61,7 @@ import com.wonderhoylabs.minori.model.ImageRecord
 import com.wonderhoylabs.minori.service.Access
 import com.wonderhoylabs.minori.service.Catalog
 import com.wonderhoylabs.minori.service.StoreCategory
+import com.wonderhoylabs.minori.service.StoreIcon
 import com.wonderhoylabs.minori.service.Template
 import com.wonderhoylabs.minori.ui.AppModel
 import com.wonderhoylabs.minori.ui.IconTile
@@ -69,9 +69,8 @@ import com.wonderhoylabs.minori.ui.ImageTile
 import com.wonderhoylabs.minori.ui.InfoRow
 import com.wonderhoylabs.minori.ui.Panel
 import com.wonderhoylabs.minori.ui.Screen
+import com.wonderhoylabs.minori.ui.StoreIconTile
 import com.wonderhoylabs.minori.ui.SubScreen
-import com.wonderhoylabs.minori.ui.storeIcon
-import com.wonderhoylabs.minori.ui.storeTile
 import com.wonderhoylabs.minori.ui.tileColors
 
 private enum class Shelf(val label: String) {
@@ -183,7 +182,7 @@ fun StoreTab(model: AppModel) {
 		if (showTermux) {
 			item {
 				ListCard(
-					tile = { IconTile(Icons.Rounded.Terminal, tileColors(2)) },
+					tile = { StoreIconTile(StoreIcon.Termux) },
 					title = "Linux in Termux",
 					subtitle = "Termux · proot",
 					text = "Debian, Ubuntu and more in Termux, on any phone. It shares the phone's kernel; it isn't a VM.",
@@ -229,13 +228,13 @@ fun StoreTab(model: AppModel) {
 @Composable
 private fun Featured(template: Template, onOpen: (Template) -> Unit) {
 	val scheme = MaterialTheme.colorScheme
-	Card(onClick = { onOpen(template) }, shape = RoundedCornerShape(28.dp), modifier = Modifier.fillMaxWidth()) {
-		Column(
-			Modifier
-				.background(Brush.linearGradient(listOf(scheme.primaryContainer, scheme.tertiaryContainer)))
-				.padding(22.dp),
-			verticalArrangement = Arrangement.spacedBy(14.dp),
-		) {
+	Card(
+		onClick = { onOpen(template) },
+		shape = RoundedCornerShape(28.dp),
+		colors = CardDefaults.cardColors(containerColor = scheme.primaryContainer),
+		modifier = Modifier.fillMaxWidth(),
+	) {
+		Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
 			Text(
 				"FEATURED",
 				style = MaterialTheme.typography.labelMedium,
@@ -243,7 +242,7 @@ private fun Featured(template: Template, onOpen: (Template) -> Unit) {
 				fontWeight = FontWeight.Bold,
 			)
 			Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-				IconTile(storeIcon(template.icon), tileColors(2), size = 64.dp)
+				StoreIconTile(template.icon, size = 64.dp)
 				Column(Modifier.weight(1f)) {
 					Text(
 						template.name,
@@ -263,7 +262,7 @@ private fun Featured(template: Template, onOpen: (Template) -> Unit) {
 @Composable
 private fun StoreRow(template: Template, onOpen: () -> Unit) {
 	ListCard(
-		tile = { IconTile(storeIcon(template.icon), tileColors(storeTile(template.icon))) },
+		tile = { StoreIconTile(template.icon) },
 		title = template.name,
 		subtitle = "${template.category.label.removeSuffix("s")} · ${downloadLabel(template)}",
 		text = template.summary,
@@ -372,7 +371,7 @@ fun StoreItemScreen(model: AppModel, templateId: String) {
 	val scheme = MaterialTheme.colorScheme
 	SubScreen(title = "", model = model) {
 		Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-			IconTile(storeIcon(template.icon), tileColors(storeTile(template.icon)), size = 96.dp)
+			StoreIconTile(template.icon, size = 96.dp)
 			Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
 				Text(template.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
 				Text(template.publisher, style = MaterialTheme.typography.bodyMedium, color = scheme.primary)

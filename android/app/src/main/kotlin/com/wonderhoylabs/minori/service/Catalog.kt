@@ -20,14 +20,15 @@ enum class StoreCategory(val label: String) {
 	App("Apps"),
 }
 
-/** Which Material Symbol an item shows. The store has no artwork of its own. */
+/** Whose logo an item shows. [Linux] is for anything else, and has a plain terminal symbol. */
 enum class StoreIcon {
 	Debian,
 	Ubuntu,
 	Fedora,
-	Desktop,
-	Browser,
-	Terminal,
+	Kde,
+	Chromium,
+	Termux,
+	Linux,
 }
 
 /** A way into a machine that a template sets up, shown on its store page. */
@@ -202,7 +203,7 @@ object Catalog {
 						"Desktop app with the machine's user and password; both show the same desktop. First boot " +
 						"downloads about 1.5 GB and takes a while; the machine's page shows when the desktop is ready.",
 				category = StoreCategory.Desktop,
-				icon = StoreIcon.Desktop,
+				icon = StoreIcon.Kde,
 				baseImage = debian13,
 				features = listOf("KDE Plasma 6", "Firefox ESR", "TigerVNC and xrdp"),
 				access = listOf(Access.Vnc, Access.Rdp, Access.Ssh),
@@ -230,7 +231,7 @@ object Catalog {
 					"Chromium in a small Openbox desktop on Debian 13, installed on first boot. Open it in Minori, or in " +
 						"any Remote Desktop app with the machine's user and password.",
 				category = StoreCategory.App,
-				icon = StoreIcon.Browser,
+				icon = StoreIcon.Chromium,
 				baseImage = debian13,
 				features = listOf("Chromium", "Openbox", "TigerVNC and xrdp"),
 				access = listOf(Access.Vnc, Access.Rdp, Access.Ssh),
