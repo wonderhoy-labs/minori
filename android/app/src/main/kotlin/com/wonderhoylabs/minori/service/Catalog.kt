@@ -113,7 +113,11 @@ object Catalog {
 			sizeMb = 550,
 		)
 
-	/** First boot of a desktop: a VNC server on display :1 and an RDP server, both logging in as the user. */
+	/**
+	 * First boot of a desktop: one session on VNC display :1, which Minori opens itself, and xrdp in front of the same
+	 * session for Remote Desktop apps. A second session for the same user, which xrdp would otherwise start, breaks
+	 * KDE. Remote Desktop logs in with the machine's password, of which VNC checks the first eight characters.
+	 */
 	private fun desktopRun(session: String): List<String> = listOf(
 		"mkdir -p /home/{user}/.config/tigervnc",
 		"printf '%s\\n' '{vncpassword}' | vncpasswd -f > /home/{user}/.config/tigervnc/passwd",
@@ -121,9 +125,29 @@ object Catalog {
 		"printf 'session=$session\\nlocalhost\\ngeometry=1600x900\\n' > /home/{user}/.config/tigervnc/config",
 		"echo ':1={user}' >> /etc/tigervnc/vncserver.users",
 		"echo '$session' > /home/{user}/.xsession",
+		// Plasma's systemd startup can't start again in a user manager that outlived the last session.
+		"printf '[General]\\nsystemdBoot=false\\n' > /home/{user}/.config/startkderc",
 		"chown -R {user}:{user} /home/{user}/.config /home/{user}/.xsession",
+		// Logging out of the desktop ends the session; this brings up a new one.
+		"mkdir -p /etc/systemd/system/tigervncserver@.service.d",
+		"printf '[Service]\\nRestart=always\\nRestartSec=3\\n' " +
+			"> /etc/systemd/system/tigervncserver@.service.d/minori.conf",
+		// TigerVNC's clipboard helper, without the window it otherwise leaves on every desktop.
+		"sed -i 's/tigervncconfig -iconic/tigervncconfig -nowin/' /etc/X11/Xtigervnc-session",
+		// The desktop's network applet asks for a password in a remote session unless the user may manage
+		// NetworkManager, which the guest's sudo user can do anyway.
+		"mkdir -p /etc/polkit-1/rules.d",
+		"printf '%s\\n' 'polkit.addRule(function (action, subject) {' " +
+			"'  if (action.id.indexOf(\"org.freedesktop.NetworkManager.\") === 0 && " +
+			"subject.isInGroup(\"sudo\")) return polkit.Result.YES;' '});' > /etc/polkit-1/rules.d/50-minori-network.rules",
+		// Remote Desktop goes straight to the VNC session, with the password the RDP app sends.
+		"sed -i 's/^autorun=$/autorun=minori/' /etc/xrdp/xrdp.ini",
+		"printf '\\n[minori]\\nname=Minori desktop\\nlib=libvnc.so\\n' >> /etc/xrdp/xrdp.ini",
+		"printf 'username=ask\\npassword=ask\\nip=127.0.0.1\\nport=5901\\n' >> /etc/xrdp/xrdp.ini",
+		"systemctl daemon-reload",
 		"systemctl enable --now tigervncserver@:1",
-		"systemctl enable --now xrdp",
+		"systemctl restart xrdp",
+		"systemctl enable xrdp",
 	)
 
 	val templates: List<Template> =
@@ -174,9 +198,9 @@ object Catalog {
 				publisher = "Debian 13 with KDE",
 				summary = "A full desktop computer on your phone.",
 				about =
-					"Debian 13 with the KDE Plasma desktop, installed on first boot. Open it in Minori over VNC, or from " +
-						"any Remote Desktop app. First boot downloads about 1.5 GB and takes a while; the machine's page " +
-						"shows when the desktop is ready.",
+					"Debian 13 with the KDE Plasma desktop, installed on first boot. Open it in Minori, or in any Remote " +
+						"Desktop app with the machine's user and password; both show the same desktop. First boot " +
+						"downloads about 1.5 GB and takes a while; the machine's page shows when the desktop is ready.",
 				category = StoreCategory.Desktop,
 				icon = StoreIcon.Desktop,
 				baseImage = debian13,
@@ -203,8 +227,8 @@ object Catalog {
 				publisher = "Debian 13 with Chromium",
 				summary = "A desktop browser in a window of its own.",
 				about =
-					"Chromium in a small Openbox desktop on Debian 13, installed on first boot. Open it in Minori over VNC, " +
-						"or from any Remote Desktop app.",
+					"Chromium in a small Openbox desktop on Debian 13, installed on first boot. Open it in Minori, or in " +
+						"any Remote Desktop app with the machine's user and password.",
 				category = StoreCategory.App,
 				icon = StoreIcon.Browser,
 				baseImage = debian13,

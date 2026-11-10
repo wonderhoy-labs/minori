@@ -121,7 +121,7 @@ class Operations(private val context: Context, private val vms: VmStore, private
 					sha256 = digest.digest().joinToString("") { "%02x".format(it) },
 					addedAt = System.currentTimeMillis(),
 					report = report,
-					source = "Picked from ${uri.authority ?: "a file"}",
+					source = "Imported from $name",
 				)
 			images.save(record)
 			return record
