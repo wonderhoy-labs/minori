@@ -4,6 +4,8 @@
 	<string name="notification_channel">Running machines</string>
 	<string name="notification_text">Minori keeps running so they do.</string>
 	<string name="stop_all">Stop all</string>
+	<string name="helper_connected">A computer is using Minori</string>
+	<string name="helper_text">Over USB, through adb. Minori stops a minute after it\'s done.</string>
 	<plurals name="machines_running">
 		<item quantity="one">%d machine running</item>
 		<item quantity="other">%d machines running</item>

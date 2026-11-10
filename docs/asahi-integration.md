@@ -1,8 +1,9 @@
 # Minori and Asahi (and Airi)
 
 Asahi is a web page that shows a Pixel's desktop in a browser tab and gives the phone a network, all over one
-USB cable, built on Shinonome's and Shira's libraries. This is the plan for letting Asahi also show Minori's VMs, and
-what Minori already provides for it. Minori's side is built and tested; Asahi's source picker isn't built yet.
+USB cable, built on Shinonome's and Shira's libraries. This is how Asahi shows Minori's VMs too, and what
+each side provides. Minori's side and Asahi's source picker are built and tested on the emulator; Asahi's side is on a
+local branch until Minori is released, since it needs Minori's library from a release.
 
 ## What Asahi should become
 
@@ -20,7 +21,12 @@ After connecting, the page lets the user pick a source, and can still use Shira 
 
 ## Minori's helper
 
-While Minori runs, it listens on the abstract Unix socket `minori`. A page reaches it through the adb connection it
+While Minori runs, it listens on the abstract Unix socket `minori`. A page starts Minori without opening it on the
+phone by running `am start-foreground-service -a com.wonderhoylabs.minori.WAKE -n
+com.wonderhoylabs.minori/.service.MinoriService` over adb (the library's `WAKE_COMMAND`). Only adb's shell may: the
+service needs `DUMP`, which the shell has and apps can't get. Android freezes apps in the background, so Minori then
+runs its foreground service, with a notification saying a computer is using it, until a minute after the page's last
+request or stream. A page reaches it through the adb connection it
 already has, with Tango's `adb.createSocket("localabstract:minori")`; from a computer, `adb forward tcp:5742
 localabstract:minori`. Android tells Minori the uid of each peer, and Minori only answers adb's shell user (2000) and root.
 Every other app on the phone is refused.
@@ -35,6 +41,7 @@ Requests and replies are one JSON object per line. A request has an `id`, which 
 | `start`   | `vm`               | The machine, as `list` describes it. Starting continues after the reply.                     |
 | `stop`    | `vm`               | The same. Minori asks the guest to shut down, then stops it after 30 seconds.                   |
 | `ports`   | `vm`               | `published`: the ports the user published; `listening`: what the guest's agent reports       |
+| `desktop` | `vm`               | `{ "port", "password" }`: the guest's VNC port, and its VNC password if it has one           |
 | `connect` | `vm`, `port`       | `{ "stream": true }`, then the connection is a byte stream to that port in the guest         |
 | `console` | `vm`               | `{ "stream": true }`, then the connection is the VM's console: its output, and your keys     |
 
@@ -57,18 +64,39 @@ of its screens. They never start anything. A page can send them with `am start -
 <link>` over adb. For one app inside a Minori VM, the link is planned as `minori://vm/<id>/app/<desktop file ID>`,
 mirroring Airi's `airi://app/<desktop file ID>`, once a guest agent can show single windows.
 
-## What's left, in Asahi and the libraries
+## The library
 
-- A TypeScript library for this protocol. By the Wonderhoy Labs rules it lives in Minori as `@wonderhoy-labs/minori`,
-  released with Minori, and Asahi depends on the release. Minori has no web app yet, and the shared web workflow builds
-  `web/`, so adding the package also means a small `web/` (a page that uses it) or a change to that workflow.
-- An RFB (VNC) viewer and a terminal in the page. noVNC (MPL 2.0) and xterm.js (MIT) are the obvious choices.
-- The source picker in Asahi, defaulting to the Pixel desktop.
-- Shinonome's mirror mode for the Pixel screen.
+`packages/minori` is `@wonderhoy-labs/minori`, the TypeScript side of all this: `Minori` for the helper, and a small
+VNC client (RFB 3.8, VNC passwords, raw and copy-rect updates) that draws on a canvas and sends the mouse and keyboard.
+The README's "Use it in your app" has an example. It has no dependencies, and takes anything that opens adb services,
+so it works with Tango.
+
+## In Asahi
+
+Asahi checks whether Minori is installed when a phone connects, which doesn't start it. Without Minori nothing changes.
+With it, the bar gets a source menu: the Pixel's desktop, and each machine's desktop (if it has Minori's agent) and
+console. Picking a machine starts it if it's stopped, waits for its desktop to listen, and draws it where the Pixel's
+desktop was, with the network still running. The Pixel's desktop keeps running on the phone meanwhile, and picking it
+again reconnects. The console is xterm.js.
+
+Tested on the emulator with the dev adb bridge: the menu listed the machine, its desktop came up at 1280×720 with
+keyboard and mouse, its console ran commands, and switching back reconnected the Pixel's desktop. From Node over the
+same helper path a key takes 16 ms to show up on the desktop; in the page it took seconds, but the browser pane was
+hidden, so the page ran as a throttled background tab, and that number says little.
+
+## What's left
+
+- Releasing Minori, so Asahi can depend on the library's tarball instead of a local link. The shared web workflow
+  builds `web/`, which Minori doesn't have, so releasing the package also needs a small `web/` or a library-only option
+  in that workflow.
+- Shinonome's mirror mode for the Pixel's own screen.
+- One Linux app from Airi or a Minori machine in the tab. Airi's windows are Android windows, so in Asahi they'd come
+  through the Pixel desktop; opening one there needs Shinonome to say which display its desktop is.
 
 ## Airi and Minori
 
-Airi shows apps from Android's own Terminal VM as Android windows. Minori runs other VMs. They don't overlap: Airi is
-the way to pin one Linux app to the launcher, Minori the way to make a Fedora, a second Debian or a KDE desktop. A Minori
-guest could later run an Airi-style compositor agent so its apps appear as Android windows too; that isn't built,
-and Minori doesn't ship a half-working one.
+Airi shows apps from Android's own Linux terminal as Android windows and launcher apps. Minori can put the same agent
+in one of its machines: a machine's page has "Apps on your launcher", which takes the agent and installer from the
+installed Airi app, runs the installer in the guest over SSH with the token from Airi's setup command, and publishes the
+guest's port 47821 on the phone's loopback, where Airi looks. Airi itself doesn't change. Only one of Android's terminal
+and a Minori machine can have that port at a time.

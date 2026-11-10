@@ -145,19 +145,37 @@ Its main entry points are `inspect::inspect`, `boot::extract`, `convert::to_raw`
 `crates/minori-core/examples/in_process.rs` runs them together. The `minori` command-line tool is the same thing on a
 computer (`minori inspect`, `convert`, `boot`, `seed`, `export`, `import`).
 
-**The helper socket**, for pages and tools on a computer that reach the phone over adb, such as Asahi: JSON lines on
-the abstract socket `minori`, answering only adb and root. It lists machines, starts and stops them, reports ports,
-and opens a stream to any guest port or to the console:
+**`@wonderhoy-labs/minori`, the TypeScript library**, for a web page or tool on a computer that reaches the phone over
+adb, such as Asahi. It talks to Minori's helper socket (`localabstract:minori`, which answers only adb and root): list
+machines, start and stop them, read their ports, and open a guest port, the console or the desktop. Its VNC client
+draws a machine's desktop on a canvas, with mouse and keyboard. It has no dependencies; add it by the release's URL:
 
-```bash
-adb forward tcp:5742 localabstract:minori
-node tools/minori-client.ts call list
+```json
+"@wonderhoy-labs/minori": "https://github.com/wonderhoy-labs/minori/releases/download/v0.1.0/wonderhoy-labs-minori-0.1.0.tgz"
 ```
+
+```ts
+import { bindInput, canvasTarget, Minori, VncClient, WAKE_COMMAND } from "@wonderhoy-labs/minori";
+
+// `adb` is Tango's Adb, or anything with createSocket(service). Wake Minori if it isn't running.
+await adb.subprocess.noneProtocol.spawnWaitText(WAKE_COMMAND);
+const minori = Minori.overAdb(adb);
+const [machine] = await minori.list();
+await minori.start(machine.id);
+const desktop = await minori.desktop(machine.id);
+const client = await VncClient.connect(await minori.connect(machine.id, desktop.port), canvasTarget(canvas), desktop.password);
+bindInput(canvas, client);
+```
+
+Its main entry points are `Minori` (`hello`, `list`, `start`, `stop`, `ports`, `desktop`, `connect`, `console`),
+`VncClient` with `canvasTarget` and `bindInput`, and `WAKE_COMMAND`, which starts Minori without opening it on the
+phone. `node tools/minori-client.ts` tries the same protocol from a terminal, after
+`adb forward tcp:5742 localabstract:minori`.
 
 **Links:** `minori://vm/<id or name>`, and `/console`, `/ssh` or `/vnc` after it, open a machine's page or screen.
 They never start anything.
 
-The protocol and links are in [docs/asahi-integration.md](docs/asahi-integration.md).
+The helper protocol and the links are in [docs/asahi-integration.md](docs/asahi-integration.md).
 
 ## What has been tested
 

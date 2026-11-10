@@ -1,0 +1,38 @@
+{
+	"name": "@wonderhoy-labs/minori",
+	"version": "0.1.0",
+	"description": "Minori's virtual machines from a web page over adb: list, start and stop them, and open their desktops, consoles and ports.",
+	"license": "Apache-2.0",
+	"type": "module",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/wonderhoy-labs/minori.git",
+		"directory": "packages/minori"
+	},
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"files": [
+		"dist"
+	],
+	"publishConfig": {
+		"exports": {
+			".": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
+			}
+		}
+	},
+	"scripts": {
+		"build": "vite build && tsc -p tsconfig.build.json",
+		"prepack": "pnpm run build",
+		"test": "vitest run",
+		"typecheck": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"@types/node": "26.6.6",
+		"typescript": "7.0.2",
+		"vite": "8.3.6",
+		"vitest": "5.0.5"
+	}
+}

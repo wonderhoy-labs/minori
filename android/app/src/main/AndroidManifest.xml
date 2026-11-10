@@ -68,13 +68,16 @@
 			</intent-filter>
 		</activity>
 
+		<!-- adb's shell may start it, to wake Minori for a page; DUMP is held by the shell, not by apps. -->
 		<service
 			android:name=".service.MinoriService"
-			android:exported="false"
-			android:foregroundServiceType="specialUse">
+			android:exported="true"
+			android:foregroundServiceType="specialUse"
+			android:permission="android.permission.DUMP"
+			tools:ignore="ExportedService">
 			<property
 				android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-				android:value="Runs the virtual machines the user started, which live in this app's process." />
+				android:value="Runs the virtual machines the user started, which live in this app's process, and answers a computer that's using them over adb." />
 		</service>
 
 		<!-- Termux's answers to RUN_COMMAND come back through a PendingIntent Minori made, so this needn't be exported. -->

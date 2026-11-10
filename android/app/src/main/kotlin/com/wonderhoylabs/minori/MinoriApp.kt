@@ -43,6 +43,10 @@ class MinoriApp : Application() {
 
 	val storageRoot: File get() = filesDir
 
+	/** The helper a page reaches over adb. */
+	lateinit var helper: Helper
+		private set
+
 	override fun onCreate() {
 		super.onCreate()
 		HiddenApi.exempt()
@@ -53,7 +57,7 @@ class MinoriApp : Application() {
 		if (BuildConfig.DEBUG) backends[BackendKind.DEMO] = DemoHypervisor { demoTarget }
 		machines = Machines(this, vms, PortForwarder(), backends)
 		operations = Operations(this, vms, images)
-		Helper(this).start()
+		helper = Helper(this).also { it.start() }
 	}
 
 	companion object {

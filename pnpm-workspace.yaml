@@ -1,5 +1,6 @@
-# Minori has no web app yet, so the workspace is just the shared tools at the top.
-packages: []
+# The shared tools at the top, and the library in packages/. Minori has no web app.
+packages:
+  - packages/*
 
 # Install scripts are off unless a package is allowed here, as `name: true`.
 allowBuilds: {}

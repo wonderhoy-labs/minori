@@ -31,6 +31,17 @@ import kotlin.concurrent.thread
  * peer's uid, and every other app is refused. The protocol is in docs/asahi-integration.md.
  */
 class Helper(private val app: MinoriApp) {
+	@Volatile private var lastUsed = 0L
+	private val streams = java.util.concurrent.atomic.AtomicInteger()
+
+	/** Marks the helper as in use now, so Minori stays running for a page: on a wake, and on every connection. */
+	fun touch() {
+		lastUsed = android.os.SystemClock.elapsedRealtime()
+	}
+
+	/** Whether a page has used the helper in the last minute, or still holds a stream open. */
+	fun inUse(): Boolean = streams.get() > 0 || android.os.SystemClock.elapsedRealtime() - lastUsed < IDLE_MS
+
 	fun start() {
 		thread(name = "minori-helper", isDaemon = true) {
 			val server =
@@ -42,6 +53,7 @@ class Helper(private val app: MinoriApp) {
 				}
 			while (true) {
 				val socket = runCatching { server.accept() }.getOrNull() ?: break
+				touch()
 				thread(name = "minori-helper-client", isDaemon = true) { serve(socket) }
 			}
 		}
@@ -86,13 +98,34 @@ class Helper(private val app: MinoriApp) {
 
 						"ports" -> send(output, result(id, ports(vm(params))))
 
+						// Only adb gets here, and adb could already open the desktop on the phone, so it may log in too.
+						"desktop" -> {
+							val vm = vm(params)
+							send(
+								output,
+								result(
+									id,
+									buildJsonObject {
+										put("port", vm.access.vncPort)
+										vm.access.vncPassword?.let { put("password", it) }
+									},
+								),
+							)
+						}
+
 						"connect" -> {
 							val vm = vm(params)
 							val port = params["port"]?.jsonPrimitive?.intOrNull ?: throw IOException("connect needs a port")
 							val guest = app.machines.guest(vm.id) ?: throw IOException("${vm.name} isn't running")
 							val remote = guest.connect(port)
 							send(output, result(id, buildJsonObject { put("stream", true) }))
-							PortForwarder.splice(input, output, remote) {}
+							streams.incrementAndGet()
+							try {
+								PortForwarder.splice(input, output, remote) {}
+							} finally {
+								streams.decrementAndGet()
+								touch()
+							}
 							return
 						}
 
@@ -101,6 +134,7 @@ class Helper(private val app: MinoriApp) {
 							val session = app.machines.console(vm.id) ?: throw IOException("${vm.name} isn't running")
 							send(output, result(id, buildJsonObject { put("stream", true) }))
 							val tap = session.tap { bytes -> runCatching { synchronized(output) { output.write(bytes) } } }
+							streams.incrementAndGet()
 							try {
 								val buffer = ByteArray(4096)
 								while (true) {
@@ -110,6 +144,8 @@ class Helper(private val app: MinoriApp) {
 								}
 							} finally {
 								tap.close()
+								streams.decrementAndGet()
+								touch()
 							}
 							return
 						}
@@ -211,8 +247,11 @@ class Helper(private val app: MinoriApp) {
 
 	companion object {
 		const val SOCKET = "minori"
+
+		/** How long Minori stays running for a page after its last request. */
+		const val IDLE_MS = 60_000L
 		const val PROTOCOL = 1
-		val METHODS = listOf("hello", "list", "start", "stop", "ports", "connect", "console")
+		val METHODS = listOf("hello", "list", "start", "stop", "ports", "desktop", "connect", "console")
 		private const val TAG = "MinoriHelper"
 		private const val ROOT_UID = 0
 		private const val SHELL_UID = 2000
