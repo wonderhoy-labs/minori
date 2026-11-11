@@ -62,8 +62,10 @@ class MinoriApp : Application() {
 		if (BuildConfig.DEBUG) backends[BackendKind.DEMO] = DemoHypervisor { demoTarget }
 		machines = Machines(this, vms, PortForwarder(), backends)
 		operations = Operations(this, vms, images)
+		// Before anything that can reach MinoriService, which reads it.
+		terminal = TerminalLink(this)
 		helper = Helper(this).also { it.start() }
-		terminal = TerminalLink(this).also { it.resume() }
+		terminal.resume()
 	}
 
 	companion object {
