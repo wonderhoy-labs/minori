@@ -237,12 +237,13 @@ debug build's demo backend pointed at real guests: Debian 13 in QEMU, and Debian
 | The terminal with Wi-Fi and mobile data off, Shira as the VPN (from Asahi's dev server on the Mac) | Same | `curl https://deb.debian.org` 200, 10 MB at 1.7 MB/s, public IP the Mac's network. With the switch off: "Could not resolve host" |
 | The terminal with Wi-Fi and mobile data off, Akiyama as the VPN (`akiyama server --adb` on the Mac) | Same | 200, 10 MB at 2.0 MB/s, the Mac's public IP. With the switch off: no DNS, no connection |
 | The Xfce machine with Wi-Fi and mobile data off, Akiyama as the VPN, `curl` over Minori's SSH | Pixel 10 Pro | The Mac's public IP, deb.debian.org 200, 10 MB at 223 KB/s |
+| The terminal with Wi-Fi and mobile data off, Saki as the VPN (`saki server` on the Mac, over Bluetooth) | Pixel 10 Pro, the terminal's Debian | The Mac's public IP, deb.debian.org 200; 4.9 MB at 55 KB/s before the test's 90-second limit |
+| The Xfce machine with Wi-Fi and mobile data off, Saki as the VPN | Pixel 10 Pro | The Mac's public IP, 2 MB at 54 KB/s |
 | Termux with Google Play's Termux (`googleplay.2026.10.09`) installed: Settings explains it and links to F-Droid | Pixel 10 Pro | Pass; 0.2.0's **Allow Minori to use Termux** did nothing |
 
 **Never run:**
 
-- Saki as the phone's VPN for Minori's machines or the terminal; and the Xfce machine through Shira with Wi-Fi off
-  (Shira's page went away before that run).
+- The Xfce machine through Shira with Wi-Fi off: Shira's page went away before that run.
 - IPv6 through the terminal's link: the agent only routes IPv4, and the terminal had no IPv6 route to leak through.
 
 - Ubuntu and Fedora from the store, and the Termux backend's other distributions.
