@@ -68,6 +68,24 @@ describe("Minori's helper client", () => {
 		expect(await reader.line()).toBe("SSH-2.0-OpenSSH_10.0\r");
 	});
 
+	it("sends a console's size when it opens, and when it changes", async () => {
+		const { minori, requests } = fakeHelper((request) => ({
+			result: request.method === "console" ? { stream: true } : {},
+		}));
+		await minori.console("Debian", { rows: 40, cols: 120 });
+		await minori.resizeConsole("Debian", { rows: 30, cols: 100 });
+		expect(requests.map((request) => [request.method, request.params])).toEqual([
+			["console", { vm: "Debian", rows: 40, cols: 120 }],
+			["resize", { vm: "Debian", rows: 30, cols: 100 }],
+		]);
+	});
+
+	it("opens a console without a size, as before", async () => {
+		const { minori, requests } = fakeHelper(() => ({ result: { stream: true } }));
+		await minori.console("Debian");
+		expect(requests[0]).toEqual(expect.objectContaining({ method: "console", params: { vm: "Debian" } }));
+	});
+
 	it("names the adb service it uses", () => {
 		expect(HELPER_SERVICE).toBe("localabstract:minori");
 	});

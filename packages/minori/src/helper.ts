@@ -23,6 +23,12 @@ export type Backend = "avf" | "termux" | "demo";
 export type MachineState = "stopped" | "starting" | "running" | "stopping" | "error";
 
 /** One of Minori's machines, as the helper describes it. */
+/** A terminal's size in character cells. */
+export interface ConsoleSize {
+	rows: number;
+	cols: number;
+}
+
 export interface Machine {
 	id: string;
 	name: string;
@@ -167,7 +173,15 @@ export class Minori {
 	}
 
 	/** A running machine's console: what it prints, and the keys you send it. */
-	console(vm: string): Promise<Duplex> {
-		return this.stream("console", { vm });
+	console(vm: string, size?: ConsoleSize): Promise<Duplex> {
+		return this.stream("console", size ? { vm, rows: size.rows, cols: size.cols } : { vm });
+	}
+
+	/**
+	 * Tells a machine's console how big your terminal is, as [console] does when it opens. Consoles with a size, such
+	 * as a Termux machine's, wrap lines to it; a VM's serial console ignores it. Minori 0.5.0 and later.
+	 */
+	async resizeConsole(vm: string, size: ConsoleSize): Promise<void> {
+		await this.call("resize", { vm, rows: size.rows, cols: size.cols });
 	}
 }
