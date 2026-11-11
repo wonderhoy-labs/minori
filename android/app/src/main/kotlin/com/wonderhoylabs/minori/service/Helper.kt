@@ -183,6 +183,8 @@ class Helper(private val app: MinoriApp) {
 		put("sshPort", vm.access.sshPort)
 		put("rdpPort", vm.access.rdpPort)
 		put("user", vm.access.user)
+		// Airi lists this machine's apps while it runs, and minori://vm/<id>/app/<desktop file ID> opens one.
+		put("airi", AiriSetup.isSetUp(vm))
 	}
 
 	private fun ports(vm: VmConfig): JsonObject {

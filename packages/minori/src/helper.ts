@@ -38,6 +38,11 @@ export interface Machine {
 	rdpPort: number;
 	/** The user that logs in. */
 	user: string;
+	/**
+	 * Whether Airi is set up in it. Then Airi lists its apps while it runs, and
+	 * `minori://vm/<id>/app/<desktop file ID>` opens one. Missing before 0.2.0.
+	 */
+	airi?: boolean;
 }
 
 /** A port the user published from a machine to the phone. */
