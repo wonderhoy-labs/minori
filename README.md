@@ -131,6 +131,7 @@ mkdir -p ~/.termux && echo 'allow-external-apps = true' >> ~/.termux/termux.prop
 ```
 
 It shares the phone's kernel and network; it's not a VM, and Minori labels it **Termux** everywhere.
+Airi can show a Termux machine's apps too, apart from Alpine's, whose musl Airi's agent doesn't run on.
 
 ### Android's own terminal through your VPN
 
@@ -203,6 +204,11 @@ Airi set up in it.
 
 The helper protocol and the links are in [docs/asahi-integration.md](docs/asahi-integration.md).
 
+**Airi** (0.4.0 and later) lists the Linux apps in Minori's machines next to Android's terminal's, and reaches them
+through Minori's `content://com.wonderhoylabs.minori.airi` provider, never through a port on the phone, so both work
+at once. It covers virtual machines with Minori's guest agent and Termux userlands with glibc. Only Airi and `adb` may
+use the provider. The contract is in [docs/airi.md](docs/airi.md).
+
 ## What has been tested
 
 On an Apple M5 Mac (macOS 27.0.1) with Android Emulator 37.2.13 and Docker Desktop, and on the maintainer's Pixel 10
@@ -224,6 +230,8 @@ debug build's demo backend pointed at real guests: Debian 13 in QEMU, and Debian
 | Every package the other app items install (Firefox, LibreOffice, Inkscape, Krita, Thunderbird, VLC, Blender) | Debian 13 arm64, a dry-run install | All found. The apps themselves weren't started |
 | Remote Desktop to KDE: FreeRDP through Minori's forwarded port and the agent                     | Same, with the emulator's app               | Logged in with the machine's password and showed the same desktop; a wrong password was refused |
 | Airi: "Apps on your launcher" with Airi 0.2.0 from its release                                    | Emulator, a Debian 13 guest container       | Airi listed the guest's apps and opened Foot in a window |
+| **Airi 0.4.0 through Minori's provider**, at the same time as a stand-in for Android's terminal on 47821: list, open Calculator and type in it, Foot from the terminal beside it, a launcher app for the machine's Calculator that starts the stopped machine, `minori://vm/…/app/foot.desktop`, and Airi's **Set up in Minori** opening the setup | Emulator (`Airi_Test_API_37`), demo backend on `minori-agent --tcp` and `airi-agent` in Debian 13 arm64 containers | Pass |
+| **Airi in a Termux machine**: Set up in Minori, Start and install (first start installed Debian with proot-distro), Foot in an Airi window, stop and start bringing the agent back on its own port | Emulator, Termux 0.118.3 (GitHub build) | Pass after a fix: the first try gave up waiting while Termux was still installing Debian |
 | Termux: check, the refusal when `allow-external-apps` is off, a Debian userland with its console  | Emulator, Termux 0.118.3                    | Pass   |
 | Helper and library: wake without opening Minori, list, start, ports, desktop, VNC login, wrong password refused | Emulator, Node 24 on the Mac       | Pass   |
 | Asahi with Minori as a source: a machine's desktop with keyboard and mouse, its console, back to the Pixel | Emulator, Asahi's dev server       | Pass   |
@@ -248,7 +256,6 @@ debug build's demo backend pointed at real guests: Debian 13 in QEMU, and Debian
 
 - Ubuntu and Fedora from the store, and the Termux backend's other distributions.
 - GNOME and the app items on a phone.
-- `minori://vm/…/app/…` on a phone, which needs Airi set up inside a machine.
 - RDP and SSH from apps on the phone itself; only FreeRDP on the Mac through the same forwarded port.
 - Auto-start at boot, growing a disk from Edit.
 - Refusing a non-adb app on the helper socket. Minori checks the peer's uid, but no other app tried.
@@ -379,6 +386,7 @@ then tag `v<VERSION>` and push both. CI builds, signs and publishes.
 - [docs/agent.md](docs/agent.md): the guest agent and its protocol
 - [docs/archive.md](docs/archive.md): the `.minorivm` format
 - [docs/asahi-integration.md](docs/asahi-integration.md): the helper socket, links, and the plan for Asahi and Airi
+- [docs/airi.md](docs/airi.md): how Airi lists and reaches the Linux apps in Minori's machines
 - [docs/roadmap.md](docs/roadmap.md): the versions, and what's next
 
 ## License and credits
