@@ -132,6 +132,18 @@ mkdir -p ~/.termux && echo 'allow-external-apps = true' >> ~/.termux/termux.prop
 
 It shares the phone's kernel and network; it's not a VM, and Minori labels it **Termux** everywhere.
 
+### Android's own terminal through your VPN
+
+Minori's machines reach the internet through Minori's own sockets, so they follow whatever VPN the phone uses: Saki,
+Akiyama, Shira or any other. Android's Linux terminal doesn't. Android connects it by tethering, which never goes
+through a VPN app, so with Wi-Fi and mobile data off it has no internet even while Saki, Akiyama or Shira works.
+
+**Settings → Android's terminal** fixes that. Tap **Set up**, then **Copy and open the terminal**, paste the command
+and press Enter. It installs Minori's guest agent in the terminal's Linux as a system service. When Android asks about
+port 5741, tap **Allow**. Then turn the card's switch on. The terminal's traffic now goes through Minori, and through
+the phone's VPN if there is one, until you turn it off. While the switch is on, Minori keeps running with a
+notification. How it works is in [docs/agent.md](docs/agent.md#androids-terminal).
+
 ## Use it in your app
 
 Minori has three ways in.

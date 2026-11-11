@@ -123,6 +123,7 @@ fun SettingsTab(model: AppModel) {
 				OutlinedButton(onClick = { checkTermux(model, app) }) { Text("Check Termux") }
 			}
 		}
+		TerminalPanel(model)
 		Panel(title = "Notifications") {
 			Status(
 				notificationsAllowed,

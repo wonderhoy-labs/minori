@@ -4,6 +4,8 @@
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufReader, Read, Write};
 use std::os::fd::AsRawFd;
+use std::os::unix::ffi::OsStrExt;
+use std::path::Path;
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
@@ -53,8 +55,14 @@ fn configure() -> io::Result<()> {
 	set_dns()
 }
 
+const RESOLV_CONF: &str = "/etc/resolv.conf";
+/// A copy of the guest's own resolv.conf while the agent's is in place.
+const BACKUP: &str = "/etc/resolv.conf.minori-backup";
+/// Where resolv.conf pointed, when it was a link, while the agent's is in place.
+const BACKUP_LINK: &str = "/etc/resolv.conf.minori-link";
+
 /// Points the guest's resolver at public DNS through the tunnel: through systemd-resolved when it runs, otherwise
-/// by writing /etc/resolv.conf, keeping a copy of the old one.
+/// by writing /etc/resolv.conf, keeping the old one to put back when the phone goes.
 fn set_dns() -> io::Result<()> {
 	let resolved = Command::new("systemctl").args(["is-active", "--quiet", "systemd-resolved"]).status();
 	if resolved.map(|status| status.success()).unwrap_or(false) {
@@ -64,16 +72,36 @@ fn set_dns() -> io::Result<()> {
 		run("resolvectl", &["domain", DEVICE, "~."])?;
 		return run("resolvectl", &["default-route", DEVICE, "true"]);
 	}
-	let path = std::path::Path::new("/etc/resolv.conf");
-	let backup = std::path::Path::new("/etc/resolv.conf.minori-backup");
-	if path.exists() && !backup.exists() {
-		let _ = std::fs::copy(path, backup);
+	let path = Path::new(RESOLV_CONF);
+	let (backup, backup_link) = (Path::new(BACKUP), Path::new(BACKUP_LINK));
+	// A backup that's already there is the guest's own, left by an agent that didn't get to put it back.
+	if !backup.exists() && !backup_link.exists() {
+		if path.is_symlink() {
+			std::fs::write(backup_link, std::fs::read_link(path)?.as_os_str().as_encoded_bytes())?;
+		} else if path.exists() {
+			std::fs::copy(path, backup)?;
+		}
 	}
 	if path.is_symlink() {
 		std::fs::remove_file(path)?;
 	}
 	let text: String = NAMESERVERS.iter().map(|server| format!("nameserver {server}\n")).collect();
-	std::fs::write(path, format!("# Written by minori-agent while Minori gives this VM internet.\n{text}"))
+	std::fs::write(path, format!("# Written by minori-agent while Minori gives this Linux internet.\n{text}"))
+}
+
+/// Puts back the resolv.conf that [`set_dns`] replaced. systemd-resolved forgets the device's servers by itself.
+fn restore_dns() {
+	let path = Path::new(RESOLV_CONF);
+	let (backup, backup_link) = (Path::new(BACKUP), Path::new(BACKUP_LINK));
+	if let Ok(target) = std::fs::read(backup_link) {
+		let _ = std::fs::remove_file(path);
+		let target = std::ffi::OsStr::from_bytes(&target);
+		if std::os::unix::fs::symlink(target, path).is_ok() {
+			let _ = std::fs::remove_file(backup_link);
+		}
+	} else if backup.exists() && std::fs::rename(backup, path).is_err() {
+		let _ = std::fs::copy(backup, path).and_then(|_| std::fs::remove_file(backup));
+	}
 }
 
 /// Carries packets between the TUN device and the phone, each a big-endian u16 length and its bytes, until the
@@ -133,6 +161,7 @@ pub(crate) fn serve<R: Read + Send + 'static, W: Write + Send + 'static>(
 		stop.store(true, Ordering::SeqCst);
 		let _ = up.join();
 		drop(tun_writer);
+		restore_dns();
 		Ok(())
 	})();
 	ACTIVE.store(false, Ordering::SeqCst);

@@ -9,6 +9,7 @@ import com.wonderhoylabs.minori.backend.Hypervisor
 import com.wonderhoylabs.minori.backend.TermuxHypervisor
 import com.wonderhoylabs.minori.model.BackendKind
 import com.wonderhoylabs.minori.net.PortForwarder
+import com.wonderhoylabs.minori.net.TerminalLink
 import com.wonderhoylabs.minori.service.Helper
 import com.wonderhoylabs.minori.service.Machines
 import com.wonderhoylabs.minori.service.Operations
@@ -43,6 +44,10 @@ class MinoriApp : Application() {
 
 	val storageRoot: File get() = filesDir
 
+	/** Carries the traffic of Android's own Linux terminal, when that's on. */
+	lateinit var terminal: TerminalLink
+		private set
+
 	/** The helper a page reaches over adb. */
 	lateinit var helper: Helper
 		private set
@@ -58,6 +63,7 @@ class MinoriApp : Application() {
 		machines = Machines(this, vms, PortForwarder(), backends)
 		operations = Operations(this, vms, images)
 		helper = Helper(this).also { it.start() }
+		terminal = TerminalLink(this).also { it.resume() }
 	}
 
 	companion object {

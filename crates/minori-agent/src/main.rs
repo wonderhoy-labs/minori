@@ -14,13 +14,16 @@
 //!   TLS and apt until it's set.
 //! - `POWEROFF` → `OK`, then the guest shuts down
 //!
-//! It listens on vsock port 5741. `--tcp <address>` listens on TCP instead, for testing without vsock.
+//! It listens on vsock port 5741. `--tcp <address>` listens on TCP instead, for testing without vsock and for Android's
+//! own Terminal, which has no vsock for apps. There `--token-file <path>` makes every connection start with
+//! `TOKEN <token>` on a line of its own, since any app on the phone can reach a port the Terminal forwards.
 
 #[cfg(target_os = "linux")]
 mod net;
 
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{Shutdown, TcpListener, TcpStream};
+use std::sync::Arc;
 use std::thread;
 
 /// The vsock port Minori connects to.
@@ -35,10 +38,11 @@ fn main() {
 			println!("minori-agent {}", env!("CARGO_PKG_VERSION"));
 			Ok(())
 		}
-		["--tcp", address] => serve_tcp(address),
+		["--tcp", address] => serve_tcp(address, None),
+		["--tcp", address, "--token-file", path] => read_token(path).and_then(|token| serve_tcp(address, Some(token))),
 		[] => serve_vsock(),
 		_ => {
-			eprintln!("Usage: minori-agent [--tcp <address>]");
+			eprintln!("Usage: minori-agent [--tcp <address> [--token-file <path>]]");
 			std::process::exit(2);
 		}
 	};
@@ -48,21 +52,56 @@ fn main() {
 	}
 }
 
-fn serve_tcp(address: &str) -> io::Result<()> {
+/// Reads the token a TCP connection must start with. It's at least 32 characters, so it can't be guessed.
+fn read_token(path: &str) -> io::Result<String> {
+	let token = std::fs::read_to_string(path)?.trim().to_owned();
+	if token.len() < 32 || token.contains(char::is_whitespace) {
+		return Err(io::Error::new(io::ErrorKind::InvalidData, format!("{path} doesn't hold a token")));
+	}
+	Ok(token)
+}
+
+fn serve_tcp(address: &str, token: Option<String>) -> io::Result<()> {
 	let listener = TcpListener::bind(address)?;
-	eprintln!("minori-agent: listening on {address}");
+	eprintln!("minori-agent: listening on {address}{}", if token.is_some() { " with a token" } else { "" });
+	let token = token.map(Arc::<str>::from);
 	for stream in listener.incoming() {
 		let stream = stream?;
 		// Packets for the guest's internet are small and mustn't wait for one another.
 		let _ = stream.set_nodelay(true);
+		let token = token.clone();
 		thread::spawn(move || {
 			let reader = stream.try_clone();
 			if let Ok(reader) = reader {
-				let _ = handle(reader, stream);
+				let _ = match token {
+					Some(token) => handle_with_token(reader, stream, &token),
+					None => handle(reader, stream),
+				};
 			}
 		});
 	}
 	Ok(())
+}
+
+/// Answers a connection only once its first line is `TOKEN <token>`.
+fn handle_with_token<R: Read + Send + 'static, W: Write + Send + 'static>(
+	reader: R,
+	mut writer: W,
+	token: &str,
+) -> io::Result<()> {
+	let mut reader = BufReader::new(reader);
+	let mut line = String::new();
+	(&mut reader).take(MAX_LINE as u64).read_line(&mut line)?;
+	let given = line.trim().strip_prefix("TOKEN ").unwrap_or("");
+	if !same(given.as_bytes(), token.as_bytes()) {
+		return writeln!(writer, "ERR wrong token");
+	}
+	handle_buffered(reader, writer)
+}
+
+/// Compares in time that doesn't depend on where the first difference is.
+fn same(a: &[u8], b: &[u8]) -> bool {
+	a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
 #[cfg(target_os = "linux")]
@@ -114,8 +153,14 @@ fn serve_vsock() -> io::Result<()> {
 }
 
 /// Answers one connection from the phone.
-fn handle<R: Read + Send + 'static, W: Write + Send + 'static>(reader: R, mut writer: W) -> io::Result<()> {
-	let mut reader = BufReader::new(reader);
+fn handle<R: Read + Send + 'static, W: Write + Send + 'static>(reader: R, writer: W) -> io::Result<()> {
+	handle_buffered(BufReader::new(reader), writer)
+}
+
+fn handle_buffered<R: Read + Send + 'static, W: Write + Send + 'static>(
+	mut reader: BufReader<R>,
+	mut writer: W,
+) -> io::Result<()> {
 	let mut line = String::new();
 	(&mut reader).take(MAX_LINE as u64).read_line(&mut line)?;
 	let line = line.trim();
@@ -322,5 +367,36 @@ mod tests {
 		let mut echoed = [0u8; 4];
 		phone.read_exact(&mut echoed).unwrap();
 		assert_eq!(&echoed, b"RUII");
+	}
+
+	fn agent_with_token(token: &'static str) -> std::net::SocketAddr {
+		let agent = TcpListener::bind("127.0.0.1:0").unwrap();
+		let address = agent.local_addr().unwrap();
+		thread::spawn(move || {
+			for stream in agent.incoming() {
+				let stream = stream.unwrap();
+				let reader = stream.try_clone().unwrap();
+				thread::spawn(move || handle_with_token(reader, stream, token));
+			}
+		});
+		address
+	}
+
+	fn ask(address: std::net::SocketAddr, lines: &str) -> String {
+		let mut phone = TcpStream::connect(address).unwrap();
+		phone.write_all(lines.as_bytes()).unwrap();
+		let mut reply = String::new();
+		BufReader::new(phone).read_line(&mut reply).unwrap();
+		reply
+	}
+
+	#[test]
+	fn answers_only_with_the_token() {
+		let token = "0123456789abcdef0123456789abcdef";
+		let address = agent_with_token(token);
+		assert!(ask(address, &format!("TOKEN {token}\nHELLO\n")).starts_with("OK minori-agent "));
+		assert_eq!(ask(address, "HELLO\n"), "ERR wrong token\n");
+		assert_eq!(ask(address, "TOKEN 0123456789abcdef0123456789abcdee\nHELLO\n"), "ERR wrong token\n");
+		assert_eq!(ask(address, "TOKEN 0123\nHELLO\n"), "ERR wrong token\n");
 	}
 }
