@@ -43,7 +43,8 @@ Requests and replies are one JSON object per line. A request has an `id`, which 
 | `ports`   | `vm`               | `published`: the ports the user published; `listening`: what the guest's agent reports       |
 | `desktop` | `vm`               | `{ "port", "password" }`: the guest's VNC port, and its VNC password if it has one           |
 | `connect` | `vm`, `port`       | `{ "stream": true }`, then the connection is a byte stream to that port in the guest         |
-| `console` | `vm`               | `{ "stream": true }`, then the connection is the VM's console: its output, and your keys     |
+| `console` | `vm`, and `rows` and `cols` if you like | `{ "stream": true }`, then the connection is the VM's console: its output, and your keys     |
+| `resize`  | `vm`, `rows`, `cols` | `{}`. Sets the size of a console that has one, such as a Termux machine's SSH; a serial console ignores it. Since 0.5.0 |
 
 `vm` is a machine's id or its name. `state` is `stopped`, `starting`, `running`, `stopping` or `error`. After a
 stream starts, the connection carries nothing else; open a new one for more requests. `connect` reaches guest ports

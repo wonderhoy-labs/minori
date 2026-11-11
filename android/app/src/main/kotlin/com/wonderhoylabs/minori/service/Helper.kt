@@ -128,9 +128,18 @@ class Helper(private val app: MinoriApp) {
 							return
 						}
 
+						"resize" -> {
+							val vm = vm(params)
+							val session = app.machines.console(vm.id) ?: throw IOException("${vm.name} isn't running")
+							val (rows, cols) = size(params) ?: throw IOException("Say the size with \"rows\" and \"cols\"")
+							session.resize(rows, cols)
+							send(output, result(id, buildJsonObject {}))
+						}
+
 						"console" -> {
 							val vm = vm(params)
 							val session = app.machines.console(vm.id) ?: throw IOException("${vm.name} isn't running")
+							size(params)?.let { (rows, cols) -> session.resize(rows, cols) }
 							send(output, result(id, buildJsonObject { put("stream", true) }))
 							val tap = session.tap { bytes -> runCatching { synchronized(output) { output.write(bytes) } } }
 							streams.incrementAndGet()
@@ -163,6 +172,17 @@ class Helper(private val app: MinoriApp) {
 		put("version", BuildConfig.VERSION_NAME)
 		put("protocol", PROTOCOL)
 		put("methods", buildJsonArray { METHODS.forEach { add(JsonPrimitive(it)) } })
+	}
+
+	/**
+	 * A terminal size from `rows` and `cols`, if both are there and sensible. It reaches consoles that have a size, such as
+	 * a Termux machine's SSH; a VM's serial console has none, and ignores it. The console is shared, so the last size
+	 * asked for wins, Minori's own console screen included.
+	 */
+	private fun size(params: JsonObject): Pair<Int, Int>? {
+		val rows = params["rows"]?.jsonPrimitive?.intOrNull ?: return null
+		val cols = params["cols"]?.jsonPrimitive?.intOrNull ?: return null
+		return if (rows in 1..1000 && cols in 1..1000) rows to cols else null
 	}
 
 	private fun vm(params: JsonObject): VmConfig {
@@ -244,7 +264,7 @@ class Helper(private val app: MinoriApp) {
 		/** How long Minori stays running for a page after its last request. */
 		const val IDLE_MS = 60_000L
 		const val PROTOCOL = 1
-		val METHODS = listOf("hello", "list", "start", "stop", "ports", "desktop", "connect", "console")
+		val METHODS = listOf("hello", "list", "start", "stop", "ports", "desktop", "connect", "console", "resize")
 		private const val TAG = "MinoriHelper"
 		private const val ROOT_UID = 0
 		private const val SHELL_UID = 2000

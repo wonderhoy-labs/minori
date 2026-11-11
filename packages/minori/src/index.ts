@@ -3,6 +3,7 @@
 export { desEncrypt, vncResponse } from "./des";
 export {
 	type Backend,
+	type ConsoleSize,
 	type Desktop,
 	HELPER_SERVICE,
 	type Hello,
