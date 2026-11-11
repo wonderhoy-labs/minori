@@ -47,6 +47,11 @@ jobs:
 
   # @wonderhoy-labs/minori, the TypeScript library for pages over adb. Minori has no site, so this only tests and packs it.
   web:
+    # web.yml's Pages job asks for these even when pages is false, and a run can't start without them.
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     uses: wonderhoy-labs/.github/.github/workflows/web.yml@main
     with:
       library: minori
