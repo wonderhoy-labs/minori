@@ -250,6 +250,9 @@ debug build's demo backend pointed at real guests: Debian 13 in QEMU, and Debian
 | The terminal with Wi-Fi and mobile data off, Saki as the VPN (`saki server` on the Mac, over Bluetooth) | Pixel 10 Pro, the terminal's Debian | The Mac's public IP, deb.debian.org 200; 4.9 MB at 55 KB/s before the test's 90-second limit |
 | The Xfce machine with Wi-Fi and mobile data off, Saki as the VPN | Pixel 10 Pro | The Mac's public IP, 2 MB at 54 KB/s |
 | Termux with Google Play's Termux (`googleplay.2026.10.09`) installed: Settings explains it and links to F-Droid | Pixel 10 Pro | Pass; 0.2.0's **Allow Minori to use Termux** did nothing |
+| **Termux on the Pixel** with F-Droid's Termux 0.118.3: Check Termux, a Debian 13 userland from **Linux in Termux** (first start about 3 minutes), its console, `apt-get install mousepad` | Pixel 10 Pro, 0.4.1 | Pass |
+| Airi in that Termux machine: Set up in Minori, Mousepad listed and opened in an Airi window, typing | Pixel 10 Pro, 0.4.1 and Airi 0.4.1 | Pass |
+| Asahi's console for that machine at the tab's size, and after the tab shrank | Pixel 10 Pro, 0.5.0 and Asahi 0.4.2 through its development server | Pass; before 0.5.0 it kept the 52 columns of Minori's own console |
 
 **Never run:**
 
