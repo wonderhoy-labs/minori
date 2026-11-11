@@ -24,7 +24,14 @@ import java.util.concurrent.atomic.AtomicInteger
  * A Linux userland Termux's proot-distro can install, and how to put an SSH server in it. [airiLibraries] installs what
  * Airi's agent needs (glibc, pixman and xkbcommon); it's null where the agent can't run, as on Alpine's musl.
  */
-data class TermuxDistro(val id: String, val name: String, val installSsh: String, val airiLibraries: String? = null)
+data class TermuxDistro(
+	val id: String,
+	val name: String,
+	val installSsh: String,
+	val airiLibraries: String? = null,
+	/** Why proot-distro can't install it on this phone, or null when it can. */
+	val unavailable: String? = null,
+)
 
 /**
  * Machines that are proot-distro userlands in Termux, for phones without AVF. They share the phone's kernel and
@@ -55,20 +62,23 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 	override fun start(vm: VmConfig, dir: File, events: GuestEvents): RunningGuest {
 		val distro =
 			DISTROS.firstOrNull { it.id == vm.distro } ?: throw IOException("Pick a distribution for this Termux machine.")
+		distro.unavailable?.let { throw IOException(it) }
 		val password = vm.access.password ?: throw IOException("This machine has no password set.")
 		val port = port(vm)
 		val firstRun = !File(dir, SET_UP_MARKER).exists()
 		// Termux answers through a PendingIntent when it refuses a command or the command ends. sshd -D doesn't end,
 		// so any answer before the port opens means something went wrong, and it says what.
 		val desktop = if (TermuxDesktop.isSetUp(vm)) vncPort(vm) to rdpPort(vm) else null
-		val ended = run(script(distro, port, password, if (vm.airi) airiPort(vm) else null, desktop), background = !firstRun)
+		// Always in the background: Termux only opens a visible session from the background with "Display over other
+		// apps", and Termux's notification shows the command running either way.
+		val ended = run(script(distro, port, password, if (vm.airi) airiPort(vm) else null, desktop), background = true)
 		val deadline = System.currentTimeMillis() + if (firstRun) SETUP_TIMEOUT_MS else START_TIMEOUT_MS
 		while (!listening(port)) {
 			ended.getNow(null)?.let { throw IOException(it.explain(distro)) }
 			if (System.currentTimeMillis() > deadline) {
 				throw IOException(
 					if (firstRun) {
-						"Termux is still setting up ${distro.name}. Watch it in Termux, then start again."
+						"Termux is still setting up ${distro.name}. Give it a few more minutes, then start again."
 					} else {
 						"The machine's SSH server didn't start in Termux."
 					},
@@ -273,6 +283,10 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 					"Arch Linux",
 					"(command -v sshd >/dev/null || pacman -Sy --noconfirm openssh)",
 					"pacman -Sy --noconfirm --needed pixman libxkbcommon xkeyboard-config",
+					// proot-distro takes Arch from Docker Hub's archlinux image, which is only built for x86-64.
+					unavailable =
+						"proot-distro only has Arch Linux for x86-64 PCs, not for this phone's 64-bit Arm processor. " +
+							"Pick Debian, Ubuntu, Alpine or Fedora.",
 				),
 				TermuxDistro("alpine", "Alpine", "(command -v sshd >/dev/null || apk add openssh)"),
 				TermuxDistro(
