@@ -218,11 +218,14 @@ debug build's demo backend pointed at real guests: Debian 13 in QEMU, and Debian
 | **KDE Plasma from the store on AVF**: download, first boot, internet through Minori (apt fetched about 1,400 packages over HTTPS), desktop ready in about 14 minutes | Pixel 10 Pro, on Wi-Fi | Pass |
 | That machine's desktop over VNC, and Remote Desktop with FreeRDP, both through Minori's helper and agent | Pixel 10 Pro, from the Mac over adb | Plasma's desktop with the right date and time |
 | Minori's own desktop viewer on that machine: picture, taps, KDE's menu, sideways                  | Pixel 10 Pro                                | Pass after a fix; 0.1.0's viewer closed at once with "Operation not supported on transport endpoint" |
+| **Xfce from the store**, 0.2.0's release build: download, first boot, internet through Minori, Xfce in Minori's viewer | Pixel 10 Pro, on Wi-Fi | Pass; setup finished in about 5 minutes |
+| Asahi with Minori as a source: the Xfce machine's desktop with a mouse, and its console | Pixel 10 Pro, Asahi's dev server in Chrome | Pass |
 
 **Never run:**
 
 - Ubuntu and Fedora from the store, and the Termux backend's other distributions.
-- Xfce, GNOME and the app items on a phone.
+- GNOME and the app items on a phone.
+- `minori://vm/…/app/…` on a phone, which needs Airi set up inside a machine.
 - RDP and SSH from apps on the phone itself; only FreeRDP on the Mac through the same forwarded port.
 - Auto-start at boot, growing a disk from Edit.
 - Refusing a non-adb app on the helper socket. Minori checks the peer's uid, but no other app tried.
