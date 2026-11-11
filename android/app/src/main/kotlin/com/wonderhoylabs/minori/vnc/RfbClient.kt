@@ -66,7 +66,7 @@ class RfbClient(private val connection: GuestConnection, private val password: S
 		output.flush()
 		width = input.readUnsignedShort()
 		height = input.readUnsignedShort()
-		input.skipBytes(16)
+		discard(16)
 		name = ByteArray(input.readInt()).also { input.readFully(it) }.toString(Charsets.UTF_8)
 		resizeFramebuffer(width, height)
 		// 32 bits per pixel, true colour, little-endian BGRX, which is Android's ARGB once read as an int.
@@ -89,6 +89,18 @@ class RfbClient(private val connection: GuestConnection, private val password: S
 		output.writeShort(encodings.size)
 		encodings.forEach { output.writeInt(it) }
 		requestUpdate(incremental = false)
+	}
+
+	// Reads and drops bytes. DataInputStream.skipBytes can't be used: past the buffer it seeks, which a vsock refuses
+	// with EOPNOTSUPP, and it may skip fewer bytes than asked.
+	private fun discard(count: Int) {
+		val scratch = ByteArray(minOf(count.coerceAtLeast(0), 8192))
+		var left = count
+		while (left > 0) {
+			val read = input.read(scratch, 0, minOf(left, scratch.size))
+			if (read < 0) throw java.io.EOFException("The VNC server closed the connection")
+			left -= read
+		}
 	}
 
 	private fun readReason(): String = ByteArray(input.readInt().coerceIn(0, 4096)).also {
@@ -168,14 +180,14 @@ class RfbClient(private val connection: GuestConnection, private val password: S
 					input.readUnsignedByte()
 					input.readUnsignedShort()
 					val colours = input.readUnsignedShort()
-					input.skipBytes(colours * 6)
+					discard(colours * 6)
 				}
 
 				2 -> {}
 
 				3 -> {
-					input.skipBytes(3)
-					input.skipBytes(input.readInt())
+					discard(3)
+					discard(input.readInt())
 				}
 
 				else -> throw IOException("The VNC server sent message $type, which Minori doesn't understand")

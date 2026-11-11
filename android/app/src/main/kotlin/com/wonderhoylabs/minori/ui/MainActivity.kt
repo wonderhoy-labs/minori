@@ -149,8 +149,10 @@ class MainActivity : ComponentActivity() {
 		if (savedInstanceState == null && privileges.avfFeature && !privileges.granted && app.vms.vms.value.isEmpty()) {
 			model.go(Screen.Setup)
 		}
-		// The screens live in the ViewModel, so an activity Android re-creates with the same intent already has them.
-		if (savedInstanceState == null) {
+		// The screens live in the ViewModel, so an activity Android re-creates with the same intent already has them, and
+		// opening Minori from Recents hands back the intent that first started it, which was already handled.
+		val fromHistory = (intent?.flags ?: 0) and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0
+		if (savedInstanceState == null && !fromHistory) {
 			if (intent?.getBooleanExtra(Privileges.AFTER_GRANT, false) == true && model.current != Screen.Setup) {
 				model.go(Screen.Setup)
 			}
@@ -168,6 +170,7 @@ class MainActivity : ComponentActivity() {
 
 	override fun onNewIntent(intent: Intent) {
 		super.onNewIntent(intent)
+		setIntent(intent)
 		if (intent.getBooleanExtra(Privileges.AFTER_GRANT, false) && model.current != Screen.Setup) model.go(Screen.Setup)
 		handleLink(intent)
 		handleDevExtras(intent)

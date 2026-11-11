@@ -175,7 +175,12 @@ class AvfHypervisor(private val context: Context) : Hypervisor {
 				} catch (error: VirtualMachineException) {
 					throw IOException("Nothing in the guest is listening on vsock port $port yet", error)
 				}
-			val reader = ParcelFileDescriptor.AutoCloseInputStream(socket.dup())
+			// FileInputStream.available() asks the kernel with FIONREAD, which a vsock answers with EOPNOTSUPP, and
+			// BufferedInputStream calls it after every short read. Saying "nothing buffered" is always true enough.
+			val reader =
+				object : java.io.FilterInputStream(ParcelFileDescriptor.AutoCloseInputStream(socket.dup())) {
+					override fun available() = 0
+				}
 			val writer = ParcelFileDescriptor.AutoCloseOutputStream(socket)
 			return object : GuestConnection {
 				override val input: InputStream = reader
