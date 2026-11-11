@@ -2,9 +2,9 @@ package com.wonderhoylabs.minori.ui.screens
 
 import android.app.ActivityManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -121,8 +121,10 @@ fun CreateScreen(model: AppModel, screen: Screen.Create) {
 	var firstBoot by rememberSaveable { mutableStateOf(cloudImage) }
 	val warning = memoryWarning(memory.toLong(), totalMib)
 	val termuxPermission =
-		rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-			if (granted) checkTermux(model, app)
+		rememberTermuxPermission(model) {
+			if (context.checkSelfPermission(TermuxHypervisor.RUN_COMMAND_PERMISSION) == PackageManager.PERMISSION_GRANTED) {
+				checkTermux(model, app)
+			}
 		}
 
 	SubScreen(title = "New machine", model = model) {
@@ -253,6 +255,13 @@ fun CreateScreen(model: AppModel, screen: Screen.Create) {
 		}
 		if (termux) {
 			Panel(title = "Before you start") {
+				if (!TermuxHypervisor.offersRunCommand(context)) {
+					Text(TermuxHypervisor.PLAY_BUILD_REASON, style = MaterialTheme.typography.bodyMedium)
+					FilledTonalButton(onClick = {
+						context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(TermuxHypervisor.FDROID_URL)))
+					}) { Text("Termux on F-Droid") }
+					return@Panel
+				}
 				Text("Termux has to let Minori run commands. In Termux, run:", style = MaterialTheme.typography.bodyMedium)
 				CommandBox("mkdir -p ~/.termux && echo 'allow-external-apps = true' >> ~/.termux/termux.properties")
 				FilledTonalButton(onClick = {

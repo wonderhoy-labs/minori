@@ -36,6 +36,8 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 		return when {
 			!installed -> Availability.Unavailable("Termux isn't installed. Install it from F-Droid or its GitHub releases.")
 
+			!offersRunCommand(context) -> Availability.Unavailable(PLAY_BUILD_REASON)
+
 			context.checkSelfPermission(RUN_COMMAND_PERMISSION) != PackageManager.PERMISSION_GRANTED ->
 				Availability.Unavailable("Minori needs permission to run commands in Termux.")
 
@@ -181,6 +183,22 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 
 		const val TERMUX = "com.termux"
 		const val RUN_COMMAND_PERMISSION = "com.termux.permission.RUN_COMMAND"
+
+		/** Where to get the Termux that has `RUN_COMMAND`. */
+		const val FDROID_URL = "https://f-droid.org/packages/com.termux/"
+
+		/** Why Google Play's Termux can't be used, said once for every screen that needs it. */
+		const val PLAY_BUILD_REASON =
+			"This Termux is the Google Play version, which doesn't let other apps run commands in it. Minori needs " +
+				"Termux from F-Droid or its GitHub releases."
+
+		/**
+		 * Whether the installed Termux lets other apps run commands at all. The F-Droid and GitHub builds declare
+		 * `RUN_COMMAND`; Google Play's build is a different app that doesn't, and Android silently skips a request
+		 * for a permission no app declares.
+		 */
+		fun offersRunCommand(context: Context): Boolean =
+			runCatching { context.packageManager.getPermissionInfo(RUN_COMMAND_PERMISSION, 0) }.isSuccess
 		private const val PORT_BASE = 20000
 		private const val PORT_RANGE = 10000
 		private const val POLL_MS = 1000L
