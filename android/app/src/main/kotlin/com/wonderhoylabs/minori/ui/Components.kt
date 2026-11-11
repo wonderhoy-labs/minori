@@ -113,7 +113,17 @@ private fun logo(icon: StoreIcon): Int? = when (icon) {
 	StoreIcon.Ubuntu -> R.drawable.logo_ubuntu
 	StoreIcon.Fedora -> R.drawable.logo_fedora
 	StoreIcon.Kde -> R.drawable.logo_kde
+	StoreIcon.Xfce -> R.drawable.logo_xfce
+	StoreIcon.Gnome -> R.drawable.logo_gnome
 	StoreIcon.Chromium -> R.drawable.logo_chromium
+	StoreIcon.Firefox -> R.drawable.logo_firefox
+	StoreIcon.LibreOffice -> R.drawable.logo_libreoffice
+	StoreIcon.Gimp -> R.drawable.logo_gimp
+	StoreIcon.Inkscape -> R.drawable.logo_inkscape
+	StoreIcon.Krita -> R.drawable.logo_krita
+	StoreIcon.Thunderbird -> R.drawable.logo_thunderbird
+	StoreIcon.Vlc -> R.drawable.logo_vlc
+	StoreIcon.Blender -> R.drawable.logo_blender
 	StoreIcon.Termux, StoreIcon.Linux -> null
 }
 

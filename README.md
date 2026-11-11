@@ -51,7 +51,7 @@ Download the APK from [Releases](https://github.com/wonderhoy-labs/minori/releas
 install it with `adb`:
 
 ```bash
-adb install -r minori-v0.1.1.apk
+adb install -r minori-v0.2.0.apk
 ```
 
 Then open Minori; its setup screen grants the two permissions virtual machines need, with Shizuku or a command for
@@ -82,7 +82,8 @@ Android closes Minori when the second one is granted. Open it again and it check
 Tap **New machine** and pick a source:
 
 - **Catalog:** Debian 13, Ubuntu 24.04 LTS or Fedora 43, downloaded from the project's own servers and checked
-  against its published checksums, or a KDE Plasma desktop or a Chromium browser built from Debian on first boot.
+  against its published checksums. Or a desktop (KDE Plasma, Xfce or GNOME) or one app (Chromium, Firefox,
+  LibreOffice, GIMP, Inkscape, Krita, Thunderbird, VLC or Blender), each built from Debian 13 on first boot.
 - **Your images:** a raw disk, `.img`, qcow2 or ISO you imported. Minori looks inside first and tells you what it is,
   which CPU it's for and whether it can boot it.
 - **Termux userland:** see below.
@@ -139,7 +140,7 @@ sparse raw disk, extract a bootable kernel and initrd, write cloud-init seeds, a
 archives. Add it by the release tag:
 
 ```toml
-minori-core = { git = "https://github.com/wonderhoy-labs/minori", tag = "v0.1.1" }
+minori-core = { git = "https://github.com/wonderhoy-labs/minori", tag = "v0.2.0" }
 ```
 
 ```rust
@@ -161,7 +162,7 @@ machines, start and stop them, read their ports, and open a guest port, the cons
 draws a machine's desktop on a canvas, with mouse and keyboard. It has no dependencies; add it by the release's URL:
 
 ```json
-"@wonderhoy-labs/minori": "https://github.com/wonderhoy-labs/minori/releases/download/v0.1.1/wonderhoy-labs-minori-0.1.1.tgz"
+"@wonderhoy-labs/minori": "https://github.com/wonderhoy-labs/minori/releases/download/v0.2.0/wonderhoy-labs-minori-0.2.0.tgz"
 ```
 
 ```ts
@@ -206,6 +207,8 @@ debug build's demo backend pointed at real guests: Debian 13 in QEMU, and Debian
 | Import an image through the file picker, make a machine, console, SSH, VNC, published ports with allow and deny rules, export, import, clone, delete | Same | Pass |
 | **Internet for the guest**: a Debian 13 guest whose only route was Minori's `minori0`, `curl https://deb.debian.org` | QEMU guest, through the emulator's app | HTTP 200; a 15 MB download at 3.9 MB/s through the test rig |
 | KDE Plasma and Chromium store items: the exact first-boot commands Minori generates            | Debian 13 containers with systemd           | Plasma and Chromium came up on VNC after install and after a reboot |
+| Xfce, GNOME and GIMP store items, the same way                                                    | Debian 13 arm64 containers with systemd     | All three came up on VNC: Xfce's desktop, GNOME Shell, and GIMP 3.0.4 filling its desktop. Not after a reboot, and not on a phone |
+| Every package the other app items install (Firefox, LibreOffice, Inkscape, Krita, Thunderbird, VLC, Blender) | Debian 13 arm64, a dry-run install | All found. The apps themselves weren't started |
 | Remote Desktop to KDE: FreeRDP through Minori's forwarded port and the agent                     | Same, with the emulator's app               | Logged in with the machine's password and showed the same desktop; a wrong password was refused |
 | Airi: "Apps on your launcher" with Airi 0.2.0 from its release                                    | Emulator, a Debian 13 guest container       | Airi listed the guest's apps and opened Foot in a window |
 | Termux: check, the refusal when `allow-external-apps` is off, a Debian userland with its console  | Emulator, Termux 0.118.3                    | Pass   |
@@ -219,6 +222,7 @@ debug build's demo backend pointed at real guests: Debian 13 in QEMU, and Debian
 **Never run:**
 
 - Ubuntu and Fedora from the store, and the Termux backend's other distributions.
+- Xfce, GNOME and the app items on a phone.
 - RDP and SSH from apps on the phone itself; only FreeRDP on the Mac through the same forwarded port.
 - Auto-start at boot, growing a disk from Edit.
 - Refusing a non-adb app on the helper socket. Minori checks the peer's uid, but no other app tried.
