@@ -211,7 +211,7 @@ debug build's demo backend pointed at real guests: Debian 13 in QEMU, and Debian
 
 | What                                                                                              | Where                                       | Result |
 | ------------------------------------------------------------------------------------------------- | ------------------------------------------- | ------ |
-| `cargo test --workspace` (15 tests), Clippy, rustfmt                                              | Mac                                         | Pass   |
+| `cargo test --workspace` (16 tests), Clippy, rustfmt                                              | Mac                                         | Pass   |
 | `:app:testDebugUnitTest` (31 tests), Spotless, `:app:lintRelease`                                 | Mac                                         | Pass   |
 | `@wonderhoy-labs/minori` (13 tests: DES vectors, the helper protocol, a VNC session against a fake server) | Mac                              | Pass   |
 | Inspect Debian 13's official arm64 cloud image (qcow2); qcow2 to raw                              | Mac and the emulator                        | Found GPT, ext4, kernel and initrd; byte-identical to `qemu-img` |
