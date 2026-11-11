@@ -179,43 +179,33 @@ The helper protocol and the links are in [docs/asahi-integration.md](docs/asahi-
 
 ## What has been tested
 
-Everything below ran on an Apple M5 Mac (macOS 27.0.1) with Android Emulator 37.2.13 and Docker Desktop. **No
-phone was used**: the maintainer's Pixel 10 Pro was unavailable, so nothing has run under AVF.
+On an Apple M5 Mac (macOS 27.0.1) with Android Emulator 37.2.13 and Docker Desktop, and on the maintainer's Pixel 10
+Pro (Android 17, `CP3A.260905.009`, user build). The emulator can't run AVF, so it tested everything around it with the
+debug build's demo backend pointed at real guests: Debian 13 in QEMU, and Debian 13 containers with systemd.
 
 | What                                                                                              | Where                                       | Result |
 | ------------------------------------------------------------------------------------------------- | ------------------------------------------- | ------ |
 | `cargo test --workspace` (15 tests), Clippy, rustfmt                                              | Mac                                         | Pass   |
-| `:app:testDebugUnitTest` (27 tests), Spotless, `:app:lintRelease`, `:app:assembleRelease`         | Mac                                         | Pass   |
-| Inspect Debian 13's official arm64 cloud image (qcow2)                                            | Mac, `minori` CLI, and in the app on the emulator | Found GPT, ext4 root, arm64, kernel and initrd |
-| qcow2 to raw                                                                                       | Mac                                         | Byte-identical to `qemu-img convert` |
-| Kernel, initrd and command line Minori extracted, plus a seed from `minori seed`                       | QEMU 10 `virt`, TCG, in Docker              | Debian 13 booted, cloud-init applied the seed, SSH logged in |
-| The disk, kernel and seed the **app** made on the emulator, exported, unpacked by `minori import`   | Same QEMU                                    | Booted: hostname, password, Minori's SSH key and `minori-agent` all set up; root grew to 8 GiB |
-| Alpine 3.24 arm64 "virt" ISO: inspect, extract its kernel, boot with the ISO attached             | Same QEMU                                    | Reached the login prompt |
-| `minori-agent` (HELLO, PORTS, CONNECT) over TCP                                                      | Debian 13 guest in QEMU                     | Pass   |
-| First run, setup screen, adb grant, Shizuku grant (Shizuku 13.6.0), relaunch after the grant kill | Emulator, Android 17 (`CE2A.260420.051.A2`), user build | Pass   |
-| Hidden API exemption reaches `VirtualMachineCustomImageConfig`                                    | Same emulator                               | Pass   |
-| Import an image through the file picker, with SHA-256, make a VM (convert, extract kernel, seed) | Same emulator                               | Pass   |
-| Demo backend console (a shell on the phone), typing with injected keys and Gboard                 | Same emulator                               | Pass   |
-| Console attached to the real Debian guest's serial port (`ttyAMA0`, via TCP), login, `top` sized to the screen | Same emulator, debug test hooks | Pass   |
-| SSH through `minori-agent` with host-key prompt (fingerprint checked against the guest)              | Same                                        | Pass   |
-| Publish guest port 22, SSH to it from the Mac via `adb forward`; deny and allow rules            | Same                                        | Pass   |
-| VNC to the guest's TigerVNC with a VNC password: live updates, pointer                            | Same                                        | Pass   |
-| Export to `.minorivm` through the file picker (403 MB for an 8 GiB disk), import it back, clone, delete keeping disks | Same emulator | Pass   |
-| Helper socket with `tools/minori-client.ts`: hello, list, start, ports, connect to SSH               | Same, with the real guest                   | Pass   |
-| A UDP port: a datagram from the emulator to the guest's echo service through `minori-agent`, and back | Same, with the real guest | Pass |
-| Termux backend: Termux 0.118.3 (GitHub release), proot-distro installed Debian 13 and sshd on first start (about 3 minutes), Minori's console logged in as root, shut down, started again in 10 s | Same emulator | Pass |
-| `minori://vm/Debian/console`                                                                         | Same emulator                               | Opens the console |
-| Release build: start, list, settings, JNI disk usage                                              | Same emulator                               | Pass   |
+| `:app:testDebugUnitTest` (31 tests), Spotless, `:app:lintRelease`                                 | Mac                                         | Pass   |
+| `@wonderhoy-labs/minori` (13 tests: DES vectors, the helper protocol, a VNC session against a fake server) | Mac                              | Pass   |
+| Inspect Debian 13's official arm64 cloud image (qcow2); qcow2 to raw                              | Mac and the emulator                        | Found GPT, ext4, kernel and initrd; byte-identical to `qemu-img` |
+| Kernel, initrd and seed Minori made, booted                                                       | QEMU 10 `virt`, TCG, in Docker              | Debian 13 booted, cloud-init applied the seed, SSH logged in |
+| Store: search, categories, item pages, real logos; machines, images and settings tabs             | Emulator, Android 17 (`CE2A.260420.051.A2`) | Looked at |
+| Import an image through the file picker, make a machine, console, SSH, VNC, published ports with allow and deny rules, export, import, clone, delete | Same | Pass |
+| **Internet for the guest**: a Debian 13 guest whose only route was Minori's `minori0`, `curl https://deb.debian.org` | QEMU guest, through the emulator's app | HTTP 200; a 15 MB download at 3.9 MB/s through the test rig |
+| KDE Plasma and Chromium store items: the exact first-boot commands Minori generates            | Debian 13 containers with systemd           | Plasma and Chromium came up on VNC after install and after a reboot |
+| Remote Desktop to KDE: FreeRDP through Minori's forwarded port and the agent                     | Same, with the emulator's app               | Logged in with the machine's password and showed the same desktop; a wrong password was refused |
+| Airi: "Apps on your launcher" with Airi 0.2.0 from its release                                    | Emulator, a Debian 13 guest container       | Airi listed the guest's apps and opened Foot in a window |
+| Termux: check, the refusal when `allow-external-apps` is off, a Debian userland with its console  | Emulator, Termux 0.118.3                    | Pass   |
+| Helper and library: wake without opening Minori, list, start, ports, desktop, VNC login, wrong password refused | Emulator, Node 24 on the Mac       | Pass   |
+| Asahi with Minori as a source: a machine's desktop with keyboard and mouse, its console, back to the Pixel | Emulator, Asahi's dev server       | Pass   |
+| AVF: Debian 13 boots, console login, the agent comes up from cloud-init, SSH over vsock           | Pixel 10 Pro                                | Pass   |
 
 **Never run:**
 
-- **The AVF backend**: creating and running a VM, the console on AVF's UART, vsock to `minori-agent`, published ports
-  over vsock, **Internet for the guest** (`useNetwork`), shutdown through the agent, and how much of this Android 17
-  lets a non-system app do. [docs/avf.md](docs/avf.md) has the details.
-- Catalog downloads in the app (Debian's image was downloaded and checked on the Mac instead), and the Ubuntu,
-  Fedora, KDE Plasma and Chromium templates.
-- The RDP and "SSH in another app" buttons, auto-start at boot, growing a disk from Edit, the helper's
-  `console` stream, and the Termux backend's other distributions (Ubuntu, Arch, Alpine, Fedora).
+- Ubuntu and Fedora from the store, and the Termux backend's other distributions.
+- RDP and SSH from apps on the phone itself; only FreeRDP on the Mac through the same forwarded port.
+- Auto-start at boot, growing a disk from Edit.
 - Refusing a non-adb app on the helper socket. Minori checks the peer's uid, but no other app tried.
 
 ## How it works

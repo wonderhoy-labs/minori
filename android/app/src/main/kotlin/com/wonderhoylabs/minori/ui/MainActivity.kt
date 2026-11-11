@@ -37,6 +37,9 @@ import androidx.lifecycle.ViewModelProvider
 import com.wonderhoylabs.minori.BuildConfig
 import com.wonderhoylabs.minori.MinoriApp
 import com.wonderhoylabs.minori.backend.DemoTarget
+import com.wonderhoylabs.minori.model.BackendKind
+import com.wonderhoylabs.minori.model.CpuMode
+import com.wonderhoylabs.minori.service.Catalog
 import com.wonderhoylabs.minori.service.Job
 import com.wonderhoylabs.minori.setup.Privileges
 import com.wonderhoylabs.minori.ui.screens.ConsoleScreen
@@ -146,11 +149,14 @@ class MainActivity : ComponentActivity() {
 		if (savedInstanceState == null && privileges.avfFeature && !privileges.granted && app.vms.vms.value.isEmpty()) {
 			model.go(Screen.Setup)
 		}
-		if (intent?.getBooleanExtra(Privileges.AFTER_GRANT, false) == true && model.current != Screen.Setup) {
-			model.go(Screen.Setup)
+		// The screens live in the ViewModel, so an activity Android re-creates with the same intent already has them.
+		if (savedInstanceState == null) {
+			if (intent?.getBooleanExtra(Privileges.AFTER_GRANT, false) == true && model.current != Screen.Setup) {
+				model.go(Screen.Setup)
+			}
+			handleLink(intent)
+			handleDevExtras(intent)
 		}
-		handleLink(intent)
-		handleDevExtras(intent)
 		setContent {
 			MinoriTheme {
 				Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -198,6 +204,30 @@ class MainActivity : ComponentActivity() {
 		val agent = intent.getStringExtra("dev_guest_agent")
 		if (console != null || agent != null) app.demoTarget = DemoTarget(console = console, agent = agent)
 		intent.getStringExtra("dev_open")?.let { id -> if (app.vms.get(id) != null) model.go(Screen.Detail(id)) }
+		// `--es dev_create <store item>`: makes a machine from the store as Get would, for tests on a locked phone,
+		// with the password from `--es dev_password`. Its progress is in logcat under MinoriDev.
+		intent.getStringExtra("dev_create")?.let { id ->
+			val template = Catalog.template(id) ?: return@let
+			val password = intent.getStringExtra("dev_password") ?: return@let
+			model.run("Getting ${template.name}", { job ->
+				val progress = Thread {
+					while (model.job.value === job) {
+						android.util.Log.i("MinoriDev", "${job.step} ${(job.fraction * 100).toInt()}%")
+						Thread.sleep(5000)
+					}
+				}.apply { isDaemon = true }
+				progress.start()
+				try {
+					app.operations.createFromTemplate(
+						template, template.name, BackendKind.AVF, CpuMode.MATCH_HOST, template.memoryMib, template.diskGib,
+						"user", password, job,
+					)
+				} catch (error: Throwable) {
+					android.util.Log.w("MinoriDev", "failed", error)
+					throw error
+				}
+			}) { android.util.Log.i("MinoriDev", "created ${it.id} ${it.name}") }
+		}
 		when (intent.getStringExtra("dev_screen")) {
 			"setup" -> model.go(Screen.Setup)
 			"store", "create" -> model.tab(Tab.Store)

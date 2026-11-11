@@ -54,6 +54,7 @@ import com.wonderhoylabs.minori.service.FirstBoot
 import com.wonderhoylabs.minori.service.Operations
 import com.wonderhoylabs.minori.service.StoreIcon
 import com.wonderhoylabs.minori.service.Template
+import com.wonderhoylabs.minori.service.hostname
 import com.wonderhoylabs.minori.ui.AppModel
 import com.wonderhoylabs.minori.ui.CommandBox
 import com.wonderhoylabs.minori.ui.IconTile
@@ -82,8 +83,6 @@ fun memoryWarning(mib: Long, totalMib: Long): String? = when {
 	mib > totalMib / 2 -> "Over half of this phone's memory. Other apps may close while it runs."
 	else -> null
 }
-
-private fun hostname(name: String) = name.lowercase().replace(Regex("[^a-z0-9-]"), "-").trim('-').ifEmpty { "minori" }
 
 @Composable
 fun CreateScreen(model: AppModel, screen: Screen.Create) {
@@ -302,15 +301,9 @@ fun CreateScreen(model: AppModel, screen: Screen.Create) {
 
 					template != null ->
 						model.run("Getting $name", { job ->
-							val fetched = Catalog.fetch(template.baseImage, app.images, job)
-							val vm =
-								app.operations.createFromImage(
-									name, fetched, backend, cpu, memoryMib, diskGib, boot, job, template = template.id,
-								)
-							template.vncPort?.let { port ->
-								val vnc = password.take(8)
-								app.vms.update(vm.id) { it.copy(access = it.access.copy(vncPort = port, vncPassword = vnc)) }
-							} ?: vm
+							app.operations.createFromTemplate(
+								template, name, backend, cpu, memoryMib, diskGib, user.ifEmpty { "user" }, password, job,
+							)
 						}) { model.replace(Screen.Detail(it.id)) }
 				}
 			},

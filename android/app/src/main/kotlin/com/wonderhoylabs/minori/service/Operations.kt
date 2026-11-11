@@ -71,6 +71,12 @@ data class FirstBoot(
 	val extraRun: List<String> = emptyList(),
 )
 
+/** A guest hostname from a machine's name: lowercase letters, digits and hyphens. */
+fun hostname(name: String): String = name.lowercase().replace(Regex("[^a-z0-9-]"), "-").trim('-').ifEmpty { "minori" }
+
+/** VNC passwords are eight characters at most. */
+const val VNC_PASSWORD_LENGTH = 8
+
 /** Everything that makes, changes or moves machines and images. All of it blocks; call on a background thread. */
 class Operations(private val context: Context, private val vms: VmStore, private val images: ImageStore) {
 	/** Brings a file the user picked into the image library: copies it with a checksum, then inspects it. */
@@ -128,6 +134,40 @@ class Operations(private val context: Context, private val vms: VmStore, private
 		} catch (error: Throwable) {
 			dir.deleteRecursively()
 			throw error
+		}
+	}
+
+	/**
+	 * Makes a machine from a store item: downloads and checks its base image, then sets it up with [user] and
+	 * [password] on first boot, with the item's packages and commands. A desktop's VNC password is the first eight
+	 * characters of [password], which is all VNC uses.
+	 */
+	fun createFromTemplate(
+		template: Template,
+		name: String,
+		backend: BackendKind,
+		cpu: CpuMode,
+		memoryMib: Int,
+		diskGib: Int,
+		user: String,
+		password: String,
+		job: Job,
+	): VmConfig {
+		val boot =
+			FirstBoot(
+				hostname = hostname(name),
+				user = user,
+				password = password,
+				packages = template.packages,
+				extraRun = template.run.map {
+					it.replace("{user}", user).replace("{vncpassword}", password.take(VNC_PASSWORD_LENGTH))
+				},
+			)
+		val fetched = Catalog.fetch(template.baseImage, images, job)
+		val vm = createFromImage(name, fetched, backend, cpu, memoryMib, diskGib, boot, job, template = template.id)
+		val port = template.vncPort ?: return vm
+		return vms.update(vm.id) {
+			it.copy(access = it.access.copy(vncPort = port, vncPassword = password.take(VNC_PASSWORD_LENGTH)))
 		}
 	}
 
