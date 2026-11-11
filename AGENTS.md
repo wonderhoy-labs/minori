@@ -69,5 +69,3 @@ x86_64-linux-android aarch64-unknown-linux-musl`). `-Pminori.abis=arm64-v8a` bui
 
 - No footer on the main screen: the maintainer asked for it to go. The "A Wonderhoy Labs project, named for…" line
   is in Settings, under About.
-- `reference/brand.md` has Minori's row before wonderhoy-labs/template does, until wonderhoy-labs/template#6 is
-  merged. Drop this line then.
