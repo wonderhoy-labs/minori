@@ -123,14 +123,14 @@ the page shows each port's state and how many connections it served or refused.
 
 ### Without a hypervisor: Termux
 
-On a phone without AVF, a **Termux userland** is a Debian, Ubuntu, Arch, Alpine or Fedora installed by Termux's
+On a phone without AVF, a **Termux userland** is a Debian, Ubuntu, Alpine or Fedora installed by Termux's
 proot-distro, with an SSH server that Minori's console logs in to. Allow Minori in Termux first:
 
 ```bash
 mkdir -p ~/.termux && echo 'allow-external-apps = true' >> ~/.termux/termux.properties
 ```
 
-It shares the phone's kernel and network; it's not a VM, and Minori labels it **Termux** everywhere.
+proot-distro only has Arch Linux for x86-64, so Minori shows it but can't make one on a phone. It shares the phone's kernel and network; it's not a VM, and Minori labels it **Termux** everywhere.
 Airi can show a Termux machine's apps too, apart from Alpine's, whose musl Airi's agent doesn't run on.
 
 A Debian or Ubuntu Termux machine can have a **desktop**: **Add a desktop** on its page installs Xfce, TigerVNC and
@@ -259,6 +259,7 @@ debug build's demo backend pointed at real guests: Debian 13 in QEMU, and Debian
 | Airi in that Termux machine: Set up in Minori, Mousepad listed and opened in an Airi window, typing | Pixel 10 Pro, 0.4.1 and Airi 0.4.1 | Pass |
 | Asahi's console for that machine at the tab's size, and after the tab shrank | Pixel 10 Pro, 0.5.0 and Asahi 0.4.2 through its development server | Pass; before 0.5.0 it kept the 52 columns of Minori's own console |
 | **Desktop in a Termux machine**: Add a desktop, Xfce in Minori's viewer, FreeRDP logging in to the same session over RDP | Pixel 10 Pro, 0.6.0; FreeRDP 3 in a Debian 13 container on the Mac through `adb forward` | Pass |
+| Arch Linux in Termux | Pixel 10 Pro, 0.6.0 | Refused by proot-distro: no arm64 image. 0.6.1 marks it unavailable |
 
 **Never run:**
 

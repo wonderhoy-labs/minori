@@ -202,12 +202,31 @@ fun CreateScreen(model: AppModel, screen: Screen.Create) {
 		} else {
 			Panel(title = "Distribution") {
 				for (option in TermuxHypervisor.DISTROS) {
+					val available = option.unavailable == null
 					Row(
 						verticalAlignment = Alignment.CenterVertically,
-						modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { distro = option.id },
+						modifier =
+							Modifier
+								.fillMaxWidth()
+								.clip(RoundedCornerShape(12.dp))
+								.clickable(enabled = available) { distro = option.id },
 					) {
-						RadioButton(selected = distro == option.id, onClick = { distro = option.id })
-						Text(option.name, style = MaterialTheme.typography.bodyLarge)
+						RadioButton(selected = distro == option.id, enabled = available, onClick = { distro = option.id })
+						Column {
+							Text(
+								option.name,
+								style = MaterialTheme.typography.bodyLarge,
+								color =
+									if (available) {
+										MaterialTheme.colorScheme.onSurface
+									} else {
+										MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+									},
+							)
+							option.unavailable?.let {
+								Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+							}
+						}
 					}
 				}
 			}
