@@ -37,7 +37,7 @@ Requests and replies are one JSON object per line. A request has an `id`, which 
 | Method    | Params             | Result                                                                                       |
 | --------- | ------------------ | -------------------------------------------------------------------------------------------- |
 | `hello`   |                    | `{ "name": "Minori", "version", "protocol": 1, "methods": [...] }`                              |
-| `list`    |                    | Every machine: `id`, `name`, `backend`, `state`, `os`, `agent`, `vncPort`, `sshPort`, `rdpPort`, `user` |
+| `list`    |                    | Every machine: `id`, `name`, `backend`, `state`, `os`, `agent`, `vncPort`, `sshPort`, `rdpPort`, `user`, `airi` |
 | `start`   | `vm`               | The machine, as `list` describes it. Starting continues after the reply.                     |
 | `stop`    | `vm`               | The same. Minori asks the guest to shut down, then stops it after 30 seconds.                   |
 | `ports`   | `vm`               | `published`: the ports the user published; `listening`: what the guest's agent reports       |
@@ -61,8 +61,13 @@ node tools/minori-client.ts check
 
 `minori://vm/<id or name>` opens a machine's page in Minori, and `minori://vm/<id or name>/console`, `/ssh` or `/vnc` one
 of its screens. They never start anything. A page can send them with `am start -a android.intent.action.VIEW -d
-<link>` over adb. For one app inside a Minori VM, the link is planned as `minori://vm/<id>/app/<desktop file ID>`,
-mirroring Airi's `airi://app/<desktop file ID>`, once a guest agent can show single windows.
+<link>` over adb.
+
+`minori://vm/<id or name>/app/<desktop file ID>` opens one Linux app from a machine, the way Airi's
+`airi://app/<desktop file ID>` does from Android's terminal, and Airi is what shows it. It needs Airi set up in that
+machine (`airi` is true in `list`). Minori starts the machine if it has to, waits for Airi's agent in it, then opens
+the app; a machine that isn't set up gets a message instead. Asahi shows one alone through Shinonome's
+`--app minori://vm/<id>/app/<desktop file ID>`. Airi lists the apps while the machine runs: see Airi's README.
 
 ## The library
 

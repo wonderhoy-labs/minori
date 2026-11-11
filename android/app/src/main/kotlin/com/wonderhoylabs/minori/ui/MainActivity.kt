@@ -2,6 +2,7 @@ package com.wonderhoylabs.minori.ui
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -34,11 +35,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
+import com.wonderhoylabs.airi.client.Airi
 import com.wonderhoylabs.minori.BuildConfig
 import com.wonderhoylabs.minori.MinoriApp
+import com.wonderhoylabs.minori.R
 import com.wonderhoylabs.minori.backend.DemoTarget
 import com.wonderhoylabs.minori.model.BackendKind
 import com.wonderhoylabs.minori.model.CpuMode
+import com.wonderhoylabs.minori.model.VmConfig
+import com.wonderhoylabs.minori.model.VmState
+import com.wonderhoylabs.minori.service.AiriSetup
 import com.wonderhoylabs.minori.service.Catalog
 import com.wonderhoylabs.minori.service.Job
 import com.wonderhoylabs.minori.setup.Privileges
@@ -57,8 +64,10 @@ import com.wonderhoylabs.minori.ui.screens.VncScreen
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 enum class Tab(val label: String, val icon: ImageVector) {
 	Machines("Machines", Icons.Rounded.Dns),
@@ -178,7 +187,8 @@ class MainActivity : ComponentActivity() {
 
 	/**
 	 * Opens `minori://vm/<id or name>`, and `/console`, `/ssh` or `/vnc` after it, for other apps and for Asahi
-	 * through `am start`. The machine has to be running for the last three; nothing is started for the caller.
+	 * through `am start`. The machine has to be running for those three; nothing is started for the caller.
+	 * `/app/<desktop file ID>` is different: it opens one Linux app through Airi, starting the machine if it has to.
 	 */
 	private fun handleLink(intent: Intent?) {
 		val uri = intent?.data ?: return
@@ -191,6 +201,41 @@ class MainActivity : ComponentActivity() {
 			"console" -> model.go(Screen.Console(vm.id))
 			"ssh" -> model.go(Screen.Ssh(vm.id))
 			"vnc" -> model.go(Screen.Vnc(vm.id, vm.access.vncPort))
+			"app" -> uri.pathSegments.getOrNull(2)?.let { openLinuxApp(vm, it) }
+		}
+	}
+
+	/**
+	 * `minori://vm/<machine>/app/<desktop file ID>` does for a machine what Airi's `airi://app/<desktop file ID>` does
+	 * for Android's terminal. Airi shows the app, so the machine needs Airi set up in it. Minori starts the machine and
+	 * waits for Airi's agent there before handing over, or Airi would start the terminal's Linux instead.
+	 */
+	private fun openLinuxApp(vm: VmConfig, desktopId: String) {
+		val app = MinoriApp.get(this)
+		if (!AiriSetup.installed(this) || !AiriSetup.isSetUp(vm)) {
+			Toast.makeText(this, getString(R.string.app_link_needs_airi, vm.name), Toast.LENGTH_LONG).show()
+			return
+		}
+		lifecycleScope.launch {
+			app.machines.start(vm.id)
+			if (withTimeoutOrNull(APP_LINK_TIMEOUT_MS) { airiReady(vm) } == true) {
+				startActivity(Airi.openIntent(desktopId))
+			} else {
+				Toast.makeText(this@MainActivity, getString(R.string.app_link_not_ready, vm.name), Toast.LENGTH_LONG)
+					.show()
+			}
+		}
+	}
+
+	/** Waits until the machine runs with Airi's agent listening. False if it fails to start. */
+	private suspend fun airiReady(vm: VmConfig): Boolean {
+		val machines = MinoriApp.get(this).machines
+		while (true) {
+			val state = machines.state(vm.id)
+			if (state is VmState.Failed) return false
+			val listening = withContext(Dispatchers.IO) { machines.guest(vm.id)?.listeningPorts() }
+			if (state == VmState.Running && listening?.contains(AiriSetup.PORT) == true) return true
+			delay(APP_LINK_POLL_MS)
 		}
 	}
 
@@ -301,3 +346,6 @@ private fun Tabs(model: AppModel, tab: Tab) {
 		}
 	}
 }
+
+private const val APP_LINK_TIMEOUT_MS = 5 * 60 * 1000L
+private const val APP_LINK_POLL_MS = 1000L

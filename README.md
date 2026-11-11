@@ -183,7 +183,9 @@ phone. `node tools/minori-client.ts` tries the same protocol from a terminal, af
 `adb forward tcp:5742 localabstract:minori`.
 
 **Links:** `minori://vm/<id or name>`, and `/console`, `/ssh` or `/vnc` after it, open a machine's page or screen.
-They never start anything.
+They never start anything. `minori://vm/<id or name>/app/<desktop file ID>` opens one Linux app from a machine
+through Airi, like Airi's own `airi://app/<desktop file ID>`, and starts the machine if it has to. The machine needs
+Airi set up in it.
 
 The helper protocol and the links are in [docs/asahi-integration.md](docs/asahi-integration.md).
 
