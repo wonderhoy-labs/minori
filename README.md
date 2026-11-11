@@ -132,6 +132,18 @@ mkdir -p ~/.termux && echo 'allow-external-apps = true' >> ~/.termux/termux.prop
 
 It shares the phone's kernel and network; it's not a VM, and Minori labels it **Termux** everywhere.
 
+### Android's own terminal through your VPN
+
+Minori's machines reach the internet through Minori's own sockets, so they follow whatever VPN the phone uses: Saki,
+Akiyama, Shira or any other. Android's Linux terminal doesn't. Android connects it by tethering, which never goes
+through a VPN app, so with Wi-Fi and mobile data off it has no internet even while Saki, Akiyama or Shira works.
+
+**Settings → Android's terminal** fixes that. Tap **Set up**, then **Copy and open the terminal**, paste the command
+and press Enter. It installs Minori's guest agent in the terminal's Linux as a system service. When Android asks about
+port 5741, tap **Allow**. Then turn the card's switch on. The terminal's traffic now goes through Minori, and through
+the phone's VPN if there is one, until you turn it off. While the switch is on, Minori keeps running with a
+notification. How it works is in [docs/agent.md](docs/agent.md#androids-terminal).
+
 ## Use it in your app
 
 Minori has three ways in.
@@ -199,7 +211,7 @@ debug build's demo backend pointed at real guests: Debian 13 in QEMU, and Debian
 
 | What                                                                                              | Where                                       | Result |
 | ------------------------------------------------------------------------------------------------- | ------------------------------------------- | ------ |
-| `cargo test --workspace` (15 tests), Clippy, rustfmt                                              | Mac                                         | Pass   |
+| `cargo test --workspace` (16 tests), Clippy, rustfmt                                              | Mac                                         | Pass   |
 | `:app:testDebugUnitTest` (31 tests), Spotless, `:app:lintRelease`                                 | Mac                                         | Pass   |
 | `@wonderhoy-labs/minori` (13 tests: DES vectors, the helper protocol, a VNC session against a fake server) | Mac                              | Pass   |
 | Inspect Debian 13's official arm64 cloud image (qcow2); qcow2 to raw                              | Mac and the emulator                        | Found GPT, ext4, kernel and initrd; byte-identical to `qemu-img` |
@@ -221,9 +233,18 @@ debug build's demo backend pointed at real guests: Debian 13 in QEMU, and Debian
 | Minori's own desktop viewer on that machine: picture, taps, KDE's menu, sideways                  | Pixel 10 Pro                                | Pass after a fix; 0.1.0's viewer closed at once with "Operation not supported on transport endpoint" |
 | **Xfce from the store**, 0.2.0's release build: download, first boot, internet through Minori, Xfce in Minori's viewer | Pixel 10 Pro, on Wi-Fi | Pass; setup finished in about 5 minutes |
 | Asahi with Minori as a source: the Xfce machine's desktop with a mouse, and its console | Pixel 10 Pro, Asahi's dev server in Chrome | Pass |
+| **Android's terminal through Minori**, 0.3.0 built locally with the release key: Set up, the install command in the terminal, Android's port 5741 allowed, the switch on | Pixel 10 Pro, the terminal's Debian | The agent answered only with the token; `minori0` became the default route |
+| The terminal with Wi-Fi and mobile data off, Shira as the VPN (from Asahi's dev server on the Mac) | Same | `curl https://deb.debian.org` 200, 10 MB at 1.7 MB/s, public IP the Mac's network. With the switch off: "Could not resolve host" |
+| The terminal with Wi-Fi and mobile data off, Akiyama as the VPN (`akiyama server --adb` on the Mac) | Same | 200, 10 MB at 2.0 MB/s, the Mac's public IP. With the switch off: no DNS, no connection |
+| The Xfce machine with Wi-Fi and mobile data off, Akiyama as the VPN, `curl` over Minori's SSH | Pixel 10 Pro | The Mac's public IP, deb.debian.org 200, 10 MB at 223 KB/s |
+| The terminal with Wi-Fi and mobile data off, Saki as the VPN (`saki server` on the Mac, over Bluetooth) | Pixel 10 Pro, the terminal's Debian | The Mac's public IP, deb.debian.org 200; 4.9 MB at 55 KB/s before the test's 90-second limit |
+| The Xfce machine with Wi-Fi and mobile data off, Saki as the VPN | Pixel 10 Pro | The Mac's public IP, 2 MB at 54 KB/s |
 | Termux with Google Play's Termux (`googleplay.2026.10.09`) installed: Settings explains it and links to F-Droid | Pixel 10 Pro | Pass; 0.2.0's **Allow Minori to use Termux** did nothing |
 
 **Never run:**
+
+- The Xfce machine through Shira with Wi-Fi off: Shira's page went away before that run.
+- IPv6 through the terminal's link: the agent only routes IPv4, and the terminal had no IPv6 route to leak through.
 
 - Ubuntu and Fedora from the store, and the Termux backend's other distributions.
 - GNOME and the app items on a phone.

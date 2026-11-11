@@ -29,6 +29,8 @@
 		<package android:name="com.termux" />
 		<!-- Airi, whose agent Minori installs in a machine so Airi can show that machine's apps. -->
 		<package android:name="com.wonderhoylabs.airi" />
+		<!-- Android's Linux terminal, whose traffic Minori can carry (net/TerminalLink.kt). -->
+		<package android:name="com.android.virtualization.terminal" />
 		<intent>
 			<action android:name="android.intent.action.VIEW" />
 			<data android:scheme="rdp" />

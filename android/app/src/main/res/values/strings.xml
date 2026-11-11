@@ -6,6 +6,8 @@
 	<string name="stop_all">Stop all</string>
 	<string name="helper_connected">A computer is using Minori</string>
 	<string name="helper_text">Over USB, through adb. Minori stops a minute after it\'s done.</string>
+	<string name="terminal_carried">Carrying the terminal\'s traffic</string>
+	<string name="terminal_text">Android\'s Linux terminal reaches the internet through Minori, and any VPN.</string>
 	<plurals name="machines_running">
 		<item quantity="one">%d machine running</item>
 		<item quantity="other">%d machines running</item>

@@ -17,7 +17,8 @@ import com.wonderhoylabs.minori.R
 import com.wonderhoylabs.minori.ui.MainActivity
 
 /**
- * Keeps Minori's process alive while machines run, and while a page over adb is using the helper. An AVF VM belongs to
+ * Keeps Minori's process alive while machines run, while a page over adb is using the helper, and while Minori carries
+ * the traffic of Android's terminal. An AVF VM belongs to
  * the process that started it, so without a foreground service Android could stop Minori, and every VM with it, as
  * soon as the app left the screen; and Android freezes a background app, which would stop the helper answering.
  */
@@ -43,14 +44,15 @@ class MinoriService : Service() {
 		if (intent?.action == ACTION_WAKE) MinoriApp.get(this).helper.touch()
 		val count = machines.runningCount()
 		val helper = MinoriApp.get(this).helper.inUse()
+		val terminal = MinoriApp.get(this).terminal.enabled
 		handler.removeCallbacks(recheck)
-		if (count == 0 && !helper) {
+		if (count == 0 && !helper && !terminal) {
 			stopForeground(STOP_FOREGROUND_REMOVE)
 			stopSelf()
 			return START_NOT_STICKY
 		}
-		if (count == 0) handler.postDelayed(recheck, RECHECK_MS)
-		val notification = notification(count)
+		if (count == 0 && !terminal) handler.postDelayed(recheck, RECHECK_MS)
+		val notification = notification(count, terminal)
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
 			startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
 		} else {
@@ -59,7 +61,7 @@ class MinoriService : Service() {
 		return START_NOT_STICKY
 	}
 
-	private fun notification(count: Int): Notification {
+	private fun notification(count: Int, terminal: Boolean): Notification {
 		val manager = getSystemService(NotificationManager::class.java)
 		manager.createNotificationChannel(
 			NotificationChannel(CHANNEL, getString(R.string.notification_channel), NotificationManager.IMPORTANCE_LOW),
@@ -77,12 +79,20 @@ class MinoriService : Service() {
 			.Builder(this, CHANNEL)
 			.setSmallIcon(android.R.drawable.ic_menu_manage)
 			.setContentTitle(
-				if (count == 0) {
-					getString(R.string.helper_connected)
-				} else {
-					resources.getQuantityString(R.plurals.machines_running, count, count)
+				when {
+					count > 0 -> resources.getQuantityString(R.plurals.machines_running, count, count)
+					terminal -> getString(R.string.terminal_carried)
+					else -> getString(R.string.helper_connected)
 				},
-			).setContentText(getString(if (count == 0) R.string.helper_text else R.string.notification_text))
+			).setContentText(
+				getString(
+					when {
+						count > 0 -> R.string.notification_text
+						terminal -> R.string.terminal_text
+						else -> R.string.helper_text
+					},
+				),
+			)
 			.setContentIntent(open)
 			.addAction(Notification.Action.Builder(null, getString(R.string.stop_all), stop).build())
 			.setOngoing(true)
@@ -96,11 +106,14 @@ class MinoriService : Service() {
 		private const val ACTION_WAKE = "com.wonderhoylabs.minori.WAKE"
 		private const val RECHECK_MS = 30_000L
 
-		/** Starts, updates or stops the service to match how many machines are running, and whether a page is here. */
+		/**
+		 * Starts, updates or stops the service to match how many machines are running, whether a page is here, and
+		 * whether Minori carries the terminal's traffic.
+		 */
 		fun update(context: Context) {
 			val intent = Intent(context, MinoriService::class.java)
 			val app = MinoriApp.get(context)
-			if (app.machines.runningCount() > 0 || app.helper.inUse()) {
+			if (app.machines.runningCount() > 0 || app.helper.inUse() || app.terminal.enabled) {
 				runCatching { context.startForegroundService(intent) }
 			} else {
 				runCatching { context.startService(intent) }
