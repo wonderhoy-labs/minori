@@ -133,6 +133,11 @@ mkdir -p ~/.termux && echo 'allow-external-apps = true' >> ~/.termux/termux.prop
 It shares the phone's kernel and network; it's not a VM, and Minori labels it **Termux** everywhere.
 Airi can show a Termux machine's apps too, apart from Alpine's, whose musl Airi's agent doesn't run on.
 
+A Debian or Ubuntu Termux machine can have a **desktop**: **Add a desktop** on its page installs Xfce, TigerVNC and
+xrdp, about 500 MB. It's one session that Minori's **Desktop** and Asahi show over VNC, and that Remote Desktop apps on
+the phone reach with **RDP app**, logging in with the first 8 characters of the machine's password. Both listen on
+the phone's loopback only, on ports of the machine's own, and start and stop with the machine.
+
 ### Android's own terminal through your VPN
 
 Minori's machines reach the internet through Minori's own sockets, so they follow whatever VPN the phone uses: Saki,
@@ -253,6 +258,7 @@ debug build's demo backend pointed at real guests: Debian 13 in QEMU, and Debian
 | **Termux on the Pixel** with F-Droid's Termux 0.118.3: Check Termux, a Debian 13 userland from **Linux in Termux** (first start about 3 minutes), its console, `apt-get install mousepad` | Pixel 10 Pro, 0.4.1 | Pass |
 | Airi in that Termux machine: Set up in Minori, Mousepad listed and opened in an Airi window, typing | Pixel 10 Pro, 0.4.1 and Airi 0.4.1 | Pass |
 | Asahi's console for that machine at the tab's size, and after the tab shrank | Pixel 10 Pro, 0.5.0 and Asahi 0.4.2 through its development server | Pass; before 0.5.0 it kept the 52 columns of Minori's own console |
+| **Desktop in a Termux machine**: Add a desktop, Xfce in Minori's viewer, FreeRDP logging in to the same session over RDP | Pixel 10 Pro, 0.6.0; FreeRDP 3 in a Debian 13 container on the Mac through `adb forward` | Pass |
 
 **Never run:**
 

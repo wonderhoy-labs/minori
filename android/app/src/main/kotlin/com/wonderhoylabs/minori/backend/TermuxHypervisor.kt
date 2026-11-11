@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import com.wonderhoylabs.minori.model.BackendKind
 import com.wonderhoylabs.minori.model.VmConfig
+import com.wonderhoylabs.minori.service.TermuxDesktop
 import com.wonderhoylabs.minori.terminal.Ssh
 import java.io.File
 import java.io.IOException
@@ -59,7 +60,8 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 		val firstRun = !File(dir, SET_UP_MARKER).exists()
 		// Termux answers through a PendingIntent when it refuses a command or the command ends. sshd -D doesn't end,
 		// so any answer before the port opens means something went wrong, and it says what.
-		val ended = run(script(distro, port, password, if (vm.airi) airiPort(vm) else null), background = !firstRun)
+		val desktop = if (TermuxDesktop.isSetUp(vm)) vncPort(vm) to rdpPort(vm) else null
+		val ended = run(script(distro, port, password, if (vm.airi) airiPort(vm) else null, desktop), background = !firstRun)
 		val deadline = System.currentTimeMillis() + if (firstRun) SETUP_TIMEOUT_MS else START_TIMEOUT_MS
 		while (!listening(port)) {
 			ended.getNow(null)?.let { throw IOException(it.explain(distro)) }
@@ -113,7 +115,9 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 				val airi = airiPort(vm)
 				val stop =
 					"pkill -f 'sshd -D -p $port'; pkill -f 'minori-airi $airi '; " +
-						"pkill -f 'airi-agent serve --port $airi'; true"
+						"pkill -f 'airi-agent serve --port $airi'; " +
+						// The desktop loop notices the SSH server has gone and stops its servers itself.
+						"true"
 				runCatching { run(stop, background = true) }
 				events.onStopped(null)
 			}
@@ -125,11 +129,24 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 		true
 	}.getOrDefault(false)
 
-	private fun script(distro: TermuxDistro, port: Int, password: String, airiPort: Int?): String {
+	private fun script(
+		distro: TermuxDistro,
+		port: Int,
+		password: String,
+		airiPort: Int?,
+		desktop: Pair<Int, Int>?,
+	): String {
 		// Airi's agent, once Minori has set it up here, runs beside the SSH server: see AiriSetup.
 		val airi = airiPort?.let { "(test ! -x $AIRI_LOOP || (nohup $AIRI_LOOP $it $port >/dev/null 2>&1 &)) && " }.orEmpty()
+		// So does the desktop, once Minori has added one: see TermuxDesktop.
+		val loop = TermuxDesktop.LOOP
+		val desktopLoop =
+			desktop
+				?.let { (vnc, rdp) -> "(test ! -x $loop || (nohup $loop $vnc $rdp $port >/dev/null 2>&1 &)) && " }
+				.orEmpty()
 		val inside =
-			"${distro.installSsh} && mkdir -p /run/sshd && ssh-keygen -A && echo 'root:$password' | chpasswd && $airi" +
+			"${distro.installSsh} && mkdir -p /run/sshd && ssh-keygen -A && echo 'root:$password' | chpasswd && " +
+				airi + desktopLoop +
 				"exec /usr/sbin/sshd -D -p $port -o PermitRootLogin=yes -o PasswordAuthentication=yes -o ListenAddress=127.0.0.1"
 		return "set -e; command -v proot-distro >/dev/null || pkg install -y proot-distro; " +
 			"proot-distro login ${distro.id} -- true 2>/dev/null || proot-distro install ${distro.id}; " +
@@ -211,6 +228,8 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 			runCatching { context.packageManager.getPermissionInfo(RUN_COMMAND_PERMISSION, 0) }.isSuccess
 		private const val PORT_BASE = 20000
 		private const val AIRI_PORT_BASE = 30000
+		private const val VNC_PORT_BASE = 40000
+		private const val RDP_PORT_BASE = 50000
 
 		/** Where Minori puts the loop that keeps Airi's agent running in a Termux machine, which has no systemd. */
 		const val AIRI_LOOP = "/root/.local/bin/minori-airi"
@@ -228,6 +247,12 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 		 * its own, apart from the 47821 that Android's terminal forwards.
 		 */
 		fun airiPort(vm: VmConfig): Int = AIRI_PORT_BASE + (vm.id.hashCode() and 0x7fffffff) % PORT_RANGE
+
+		/** The port a Termux machine's desktop listens on for VNC, on the phone's loopback. */
+		fun vncPort(vm: VmConfig): Int = VNC_PORT_BASE + (vm.id.hashCode() and 0x7fffffff) % PORT_RANGE
+
+		/** The port a Termux machine's desktop listens on for Remote Desktop, on the phone's loopback. */
+		fun rdpPort(vm: VmConfig): Int = RDP_PORT_BASE + (vm.id.hashCode() and 0x7fffffff) % PORT_RANGE
 
 		val DISTROS =
 			listOf(

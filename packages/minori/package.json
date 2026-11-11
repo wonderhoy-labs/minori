@@ -1,6 +1,6 @@
 {
 	"name": "@wonderhoy-labs/minori",
-	"version": "0.5.0",
+	"version": "0.6.0",
 	"description": "Minori's virtual machines from a web page over adb: list, start and stop them, and open their desktops, consoles and ports.",
 	"license": "Apache-2.0",
 	"type": "module",

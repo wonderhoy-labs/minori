@@ -49,6 +49,11 @@ export interface Machine {
 	 * `minori://vm/<id>/app/<desktop file ID>` opens one. Missing before 0.2.0.
 	 */
 	airi?: boolean;
+	/**
+	 * Whether [desktop] leads to a desktop: a desktop from the store, or one Minori added to a Termux machine. Minori
+	 * before 0.6.0 leaves it out.
+	 */
+	desktop?: boolean;
 }
 
 /** A port the user published from a machine to the phone. */

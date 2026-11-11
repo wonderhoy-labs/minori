@@ -83,6 +83,7 @@ import com.wonderhoylabs.minori.net.Firewall
 import com.wonderhoylabs.minori.net.NetworkState
 import com.wonderhoylabs.minori.service.AiriSetup
 import com.wonderhoylabs.minori.service.Catalog
+import com.wonderhoylabs.minori.service.TermuxDesktop
 import com.wonderhoylabs.minori.service.gib
 import com.wonderhoylabs.minori.store.usage
 import com.wonderhoylabs.minori.ui.ActionTile
@@ -179,9 +180,9 @@ fun DetailScreen(model: AppModel, vmId: String) {
 			ActionTile(Icons.Rounded.Terminal, "Console", running) { model.go(Screen.Console(vm.id)) }
 			if (vm.backend != BackendKind.TERMUX) {
 				ActionTile(Icons.Rounded.VpnKey, "SSH", running && vm.access.password != null) { model.go(Screen.Ssh(vm.id)) }
-				if (desktop) {
-					ActionTile(Icons.Rounded.DesktopWindows, "Desktop", running) { model.go(Screen.Vnc(vm.id, vm.access.vncPort)) }
-				}
+			}
+			if (desktop) {
+				ActionTile(Icons.Rounded.DesktopWindows, "Desktop", running) { model.go(Screen.Vnc(vm.id, vm.access.vncPort)) }
 			}
 		}
 		if (running && desktop && template != null) {
@@ -215,6 +216,7 @@ fun DetailScreen(model: AppModel, vmId: String) {
 		if (vm.backend != BackendKind.TERMUX) InternetPanel(vm, running)
 		if (vm.access.password != null) LoginPanel(model, vm, running, desktop)
 		if (AiriSetup.canSetUp(vm)) AiriPanel(model, vm, running)
+		if (TermuxDesktop.canSetUp(vm) && !TermuxDesktop.isSetUp(vm)) TermuxDesktopPanel(model, vm, running)
 		if (vm.backend != BackendKind.TERMUX) PortsPanel(vm, running, listening, onEdit = { editPort = it })
 		Panel(title = "Machine") {
 			InfoRow(Icons.Rounded.Memory, "Runs as", backendLabel(vm.backend))
@@ -429,6 +431,21 @@ private fun LoginPanel(model: AppModel, vm: VmConfig, running: Boolean, desktop:
 				IconButton(onClick = {
 					copy(context, password)
 				}) { Icon(Icons.Rounded.ContentCopy, contentDescription = "Copy password") }
+			}
+		}
+		if (vm.backend == BackendKind.TERMUX && desktop) {
+			// A Termux machine's Remote Desktop is already on the phone's loopback, on the machine's own port.
+			FilledTonalButton(enabled = running, onClick = {
+				openExternal(
+					context,
+					Uri.parse("rdp://full%20address=s:127.0.0.1:${vm.access.rdpPort}&username=s:${vm.access.user}"),
+					"a Remote Desktop app such as Windows App or aFreeRDP",
+					"127.0.0.1:${vm.access.rdpPort}",
+					model,
+				)
+			}) {
+				Icon(Icons.AutoMirrored.Rounded.ScreenShare, contentDescription = null, modifier = Modifier.size(18.dp))
+				Text("  RDP app")
 			}
 		}
 		if (vm.backend != BackendKind.TERMUX) {
@@ -651,4 +668,24 @@ fun PortDialog(
 			}
 		},
 	)
+}
+
+/** For a Termux machine without a desktop: adds Xfce, which shows here, in Asahi and in Remote Desktop apps. */
+@Composable
+private fun TermuxDesktopPanel(model: AppModel, vm: VmConfig, running: Boolean) {
+	val context = LocalContext.current
+	val app = MinoriApp.get(context)
+	Panel(title = "Desktop") {
+		Text(
+			"Add Xfce to ${vm.name}. It shows in Minori and in Asahi, and Remote Desktop apps on this phone reach it too. " +
+				"It downloads about 500 MB and takes a few minutes.",
+			style = MaterialTheme.typography.bodySmall,
+			color = MaterialTheme.colorScheme.onSurfaceVariant,
+		)
+		FilledTonalButton(enabled = running, onClick = {
+			model.run("Adding a desktop to ${vm.name}", { job -> TermuxDesktop.install(context, app.vms, vm, job) }) {
+				model.message.value = "${vm.name} has a desktop now. Open it with Desktop."
+			}
+		}) { Text(if (running) "Add a desktop" else "Start it to add a desktop") }
+	}
 }
