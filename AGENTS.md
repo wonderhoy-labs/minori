@@ -62,10 +62,9 @@ x86_64-linux-android aarch64-unknown-linux-musl`). `-Pminori.abis=arm64-v8a` bui
   because other sessions use the shared one.
 - Disk images live in app-private storage. Catalog downloads come only from each project's own servers, checked
   against its published checksums.
-- No signing key exists yet. CI signs with `MINORI_KEYSTORE_BASE64`, `MINORI_KEYSTORE_PASSWORD`, `MINORI_KEY_ALIAS` and
-  `MINORI_KEY_PASSWORD` once the maintainer makes them; never replace that key afterwards.
+- Never replace the Android signing key. CI signs with the `MINORI_KEYSTORE_BASE64`, `MINORI_KEYSTORE_PASSWORD`,
+  `MINORI_KEY_ALIAS` and `MINORI_KEY_PASSWORD` secrets.
 
 ## Exceptions to the guideline
 
-- No footer on the main screen: the maintainer asked for it to go. The "A Wonderhoy Labs project, named for…" line
-  is in Settings, under About.
+None.

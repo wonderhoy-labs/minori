@@ -32,8 +32,6 @@ page, and add a row here in the template.
 
 - **README badge**: `img.shields.io/badge/<Character>-<Unit>-<colour>`, linking to the credits. `pnpm unify`
   checks the exact markup.
-- **Footer** of the main screen, on the web and Android: "A Wonderhoy Labs project, named for <Character> of
-  <Unit>."
 - **Colours**: everything in the app comes from the image colour (see [design.md](design.md)).
 - **Logo**: the maintainer's art for the project. Agents never make one.
 
