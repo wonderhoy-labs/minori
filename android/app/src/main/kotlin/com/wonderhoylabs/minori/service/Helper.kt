@@ -5,7 +5,9 @@ import android.net.LocalSocket
 import android.util.Log
 import com.wonderhoylabs.minori.BuildConfig
 import com.wonderhoylabs.minori.MinoriApp
+import com.wonderhoylabs.minori.backend.TermuxHypervisor
 import com.wonderhoylabs.minori.core.MinoriJson
+import com.wonderhoylabs.minori.model.BackendKind
 import com.wonderhoylabs.minori.model.VmConfig
 import com.wonderhoylabs.minori.net.PortForwarder
 import kotlinx.serialization.json.JsonElement
@@ -199,11 +201,14 @@ class Helper(private val app: MinoriApp) {
 		vm.os?.let { put("os", it) }
 		put("agent", vm.agent)
 		put("vncPort", vm.access.vncPort)
-		put("sshPort", vm.access.sshPort)
+		// A Termux machine's SSH server is on the phone's own loopback, on a port of its own; connect reaches it there.
+		put("sshPort", if (vm.backend == BackendKind.TERMUX) TermuxHypervisor(app).port(vm) else vm.access.sshPort)
 		put("rdpPort", vm.access.rdpPort)
 		put("user", vm.access.user)
 		// Airi lists this machine's apps while it runs, and minori://vm/<id>/app/<desktop file ID> opens one.
 		put("airi", AiriSetup.isSetUp(vm))
+		// Whether desktop and vncPort lead to a desktop: a store desktop, an image with VNC set, or a Termux machine's.
+		put("desktop", Catalog.template(vm.template)?.vncPort != null || vm.access.vncPassword != null)
 	}
 
 	private fun ports(vm: VmConfig): JsonObject {
