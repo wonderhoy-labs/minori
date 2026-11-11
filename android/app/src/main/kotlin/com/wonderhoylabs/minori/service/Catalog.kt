@@ -26,7 +26,17 @@ enum class StoreIcon {
 	Ubuntu,
 	Fedora,
 	Kde,
+	Xfce,
+	Gnome,
 	Chromium,
+	Firefox,
+	LibreOffice,
+	Gimp,
+	Inkscape,
+	Krita,
+	Thunderbird,
+	Vlc,
+	Blender,
 	Termux,
 	Linux,
 }
@@ -114,18 +124,23 @@ object Catalog {
 			sizeMb = 550,
 		)
 
+	// What every desktop and app runs on: one VNC session, which Remote Desktop shows too.
+	private val DESKTOP_SERVERS = listOf("tigervnc-standalone-server", "xrdp", "dbus-x11")
+
 	/**
 	 * First boot of a desktop: one session on VNC display :1, which Minori opens itself, and xrdp in front of the same
 	 * session for Remote Desktop apps. A second session for the same user, which xrdp would otherwise start, breaks
 	 * KDE. Remote Desktop logs in with the machine's password, of which VNC checks the first eight characters.
+	 * [session] names the session for TigerVNC, and [xsession] is what starts it when TigerVNC doesn't know that name
+	 * and falls back to `~/.xsession`.
 	 */
-	private fun desktopRun(session: String): List<String> = listOf(
+	private fun desktopRun(session: String, xsession: String = session): List<String> = listOf(
 		"mkdir -p /home/{user}/.config/tigervnc",
 		"printf '%s\\n' '{vncpassword}' | vncpasswd -f > /home/{user}/.config/tigervnc/passwd",
 		"chmod 600 /home/{user}/.config/tigervnc/passwd",
 		"printf 'session=$session\\nlocalhost\\ngeometry=1600x900\\n' > /home/{user}/.config/tigervnc/config",
 		"echo ':1={user}' >> /etc/tigervnc/vncserver.users",
-		"echo '$session' > /home/{user}/.xsession",
+		"printf '%s\\n' '$xsession' > /home/{user}/.xsession",
 		// Plasma's systemd startup can't start again in a user manager that outlived the last session.
 		"printf '[General]\\nsystemdBoot=false\\n' > /home/{user}/.config/startkderc",
 		"chown -R {user}:{user} /home/{user}/.config /home/{user}/.xsession",
@@ -223,40 +238,200 @@ object Catalog {
 				firstBoot = "ten to twenty minutes",
 			),
 			Template(
-				id = "chromium",
-				name = "Chromium",
-				publisher = "Debian 13 with Chromium",
-				summary = "A desktop browser in a window of its own.",
+				id = "xfce-desktop",
+				name = "Xfce",
+				publisher = "Debian 13 with Xfce",
+				summary = "A light, quick desktop computer.",
 				about =
-					"Chromium in a small Openbox desktop on Debian 13, installed on first boot. Open it in Minori, or in " +
-						"any Remote Desktop app with the machine's user and password.",
-				category = StoreCategory.App,
-				icon = StoreIcon.Chromium,
+					"Debian 13 with the Xfce desktop, installed on first boot. It's lighter than KDE Plasma and GNOME, so it " +
+						"starts faster and leaves the phone more memory. Open it in Minori, or in any Remote Desktop app " +
+						"with the machine's user and password; both show the same desktop.",
+				category = StoreCategory.Desktop,
+				icon = StoreIcon.Xfce,
 				baseImage = debian13,
-				features = listOf("Chromium", "Openbox", "TigerVNC and xrdp"),
+				features = listOf("Xfce 4.20", "Firefox ESR", "TigerVNC and xrdp"),
 				access = listOf(Access.Vnc, Access.Rdp, Access.Ssh),
-				extraDownloadMb = 400,
+				extraDownloadMb = 700,
 				memoryMib = 3072,
-				diskGib = 10,
+				diskGib = 12,
+				packages = listOf("xfce4", "xfce4-terminal", "mousepad", "firefox-esr") + DESKTOP_SERVERS,
+				run = desktopRun("startxfce4"),
+				vncPort = 5901,
+				firstBoot = "five to ten minutes",
+			),
+			Template(
+				id = "gnome-desktop",
+				name = "GNOME",
+				publisher = "Debian 13 with GNOME",
+				summary = "Debian's own desktop, the GNOME way.",
+				about =
+					"Debian 13 with the GNOME desktop, installed on first boot. Open it in Minori, or in any Remote " +
+						"Desktop app with the machine's user and password; both show the same desktop. The phone draws " +
+						"it without a graphics card, so animations are off. First boot downloads about 1.2 GB.",
+				category = StoreCategory.Desktop,
+				icon = StoreIcon.Gnome,
+				baseImage = debian13,
+				features = listOf("GNOME 48", "Firefox ESR", "TigerVNC and xrdp"),
+				access = listOf(Access.Vnc, Access.Rdp, Access.Ssh),
+				extraDownloadMb = 1200,
+				memoryMib = 4096,
+				diskGib = 16,
 				packages =
 					listOf(
-						"chromium",
-						"openbox",
-						"tigervnc-standalone-server",
-						"xrdp",
-						"dbus-x11",
-					),
+						"gnome-session",
+						"gnome-shell",
+						"gnome-console",
+						"nautilus",
+						"gnome-text-editor",
+						"gnome-control-center",
+						"firefox-esr",
+					) + DESKTOP_SERVERS,
 				run =
-					listOf(
-						"mkdir -p /home/{user}/.config/openbox",
-						"echo 'chromium --start-maximized &' > /home/{user}/.config/openbox/autostart",
-					) + desktopRun("openbox-session"),
+					desktopRun(
+						"gnome-xorg",
+						"export XDG_SESSION_TYPE=x11 XDG_CURRENT_DESKTOP=GNOME; exec gnome-session",
+					) +
+						// Without a graphics card, animations only make it feel slow. Locking needs GNOME's own login
+						// screen, which a VNC session doesn't have, so GNOME would only say it can't.
+						"sudo -u {user} dbus-run-session sh -c 'gsettings set org.gnome.desktop.interface " +
+						"enable-animations false; gsettings set org.gnome.desktop.screensaver lock-enabled false'",
 				vncPort = 5901,
-				firstBoot = "about five minutes",
+				firstBoot = "ten to twenty minutes",
+			),
+			app(
+				id = "chromium",
+				name = "Chromium",
+				summary = "A desktop browser in a window of its own.",
+				icon = StoreIcon.Chromium,
+				packages = listOf("chromium"),
+				command = "chromium --start-maximized",
+				downloadMb = 400,
+			),
+			app(
+				id = "firefox",
+				name = "Firefox",
+				summary = "Mozilla's browser, the desktop version.",
+				icon = StoreIcon.Firefox,
+				packages = listOf("firefox-esr"),
+				command = "firefox-esr",
+				downloadMb = 300,
+				feature = "Firefox ESR",
+			),
+			app(
+				id = "libreoffice",
+				name = "LibreOffice",
+				summary = "Documents, spreadsheets and slides.",
+				icon = StoreIcon.LibreOffice,
+				packages = listOf("libreoffice-writer", "libreoffice-calc", "libreoffice-impress", "libreoffice-gtk3"),
+				command = "libreoffice",
+				downloadMb = 700,
+				feature = "Writer, Calc and Impress",
+			),
+			app(
+				id = "gimp",
+				name = "GIMP",
+				summary = "Edit photos and paint.",
+				icon = StoreIcon.Gimp,
+				packages = listOf("gimp"),
+				command = "gimp",
+				downloadMb = 500,
+			),
+			app(
+				id = "inkscape",
+				name = "Inkscape",
+				summary = "Draw and edit vector graphics.",
+				icon = StoreIcon.Inkscape,
+				packages = listOf("inkscape"),
+				command = "inkscape",
+				downloadMb = 500,
+			),
+			app(
+				id = "krita",
+				name = "Krita",
+				summary = "Digital painting.",
+				icon = StoreIcon.Krita,
+				packages = listOf("krita"),
+				command = "krita",
+				downloadMb = 800,
+				memoryMib = 4096,
+			),
+			app(
+				id = "thunderbird",
+				name = "Thunderbird",
+				summary = "Email, calendars and contacts.",
+				icon = StoreIcon.Thunderbird,
+				packages = listOf("thunderbird"),
+				command = "thunderbird",
+				downloadMb = 300,
+			),
+			app(
+				id = "vlc",
+				name = "VLC",
+				summary = "Plays nearly any video or music file.",
+				icon = StoreIcon.Vlc,
+				packages = listOf("vlc"),
+				command = "vlc",
+				downloadMb = 300,
+			),
+			app(
+				id = "blender",
+				name = "Blender",
+				summary = "3D modelling and animation.",
+				icon = StoreIcon.Blender,
+				packages = listOf("blender"),
+				command = "blender",
+				downloadMb = 900,
+				memoryMib = 4096,
+				diskGib = 12,
 			),
 		)
 
 	fun template(id: String?): Template? = templates.firstOrNull { it.id == id }
+
+	/**
+	 * One desktop app alone in a small Openbox desktop, filling it. The app opens again if it's closed, since it's all
+	 * the desktop is for. TigerVNC and Remote Desktop show it the same way as a full desktop.
+	 */
+	private fun app(
+		id: String,
+		name: String,
+		summary: String,
+		icon: StoreIcon,
+		packages: List<String>,
+		command: String,
+		downloadMb: Int,
+		feature: String = name,
+		memoryMib: Int = 3072,
+		diskGib: Int = 10,
+	) = Template(
+		id = id,
+		name = name,
+		publisher = "Debian 13 with $name",
+		summary = summary,
+		about =
+			"$name on its own in a small desktop on Debian 13, installed on first boot. Open it in Minori, or in any " +
+				"Remote Desktop app with the machine's user and password. It opens again if you close it.",
+		category = StoreCategory.App,
+		icon = icon,
+		baseImage = debian13,
+		features = listOf(feature, "Openbox", "TigerVNC and xrdp"),
+		access = listOf(Access.Vnc, Access.Rdp, Access.Ssh),
+		extraDownloadMb = downloadMb,
+		memoryMib = memoryMib,
+		diskGib = diskGib,
+		packages = packages + "openbox" + DESKTOP_SERVERS,
+		run =
+			listOf(
+				"mkdir -p /home/{user}/.config/openbox",
+				"printf '%s\\n' '(while true; do $command; sleep 1; done) &' > /home/{user}/.config/openbox/autostart",
+				// Its windows fill the desktop without a title bar; dialogs stay as they are.
+				"cp /etc/xdg/openbox/rc.xml /home/{user}/.config/openbox/rc.xml",
+				"sed -i 's#</applications>#<application class=\"*\" type=\"normal\"><decor>no</decor>" +
+					"<maximized>yes</maximized></application></applications>#' /home/{user}/.config/openbox/rc.xml",
+			) + desktopRun("openbox-session"),
+		vncPort = 5901,
+		firstBoot = "about five minutes",
+	)
 
 	/**
 	 * Downloads a base image into the library, resuming a partial download, and checks it against the project's
