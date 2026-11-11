@@ -82,7 +82,7 @@ Android closes Minori when the second one is granted. Open it again and it check
 
 Tap **New machine** and pick a source:
 
-- **Catalog:** Debian 13, Ubuntu 24.04 LTS or Fedora 43, downloaded from the project's own servers and checked
+- **Catalog:** Debian 13, Ubuntu 26.04 or 24.04 LTS or Fedora 43, downloaded from the project's own servers and checked
   against its published checksums. Or a desktop (KDE Plasma, Xfce or GNOME) or one app (Chromium, Firefox,
   LibreOffice, GIMP, Inkscape, Krita, Thunderbird, VLC or Blender), each built from Debian 13 on first boot.
 - **Your images:** a raw disk, `.img`, qcow2 or ISO you imported. Minori looks inside first and tells you what it is,

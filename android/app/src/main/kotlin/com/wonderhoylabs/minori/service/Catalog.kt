@@ -102,6 +102,17 @@ object Catalog {
 			sizeMb = 330,
 		)
 
+	private val ubuntu2604 =
+		BaseImage(
+			id = "ubuntu-26.04-arm64",
+			url = "https://cloud-images.ubuntu.com/releases/resolute/release/ubuntu-26.04-server-cloudimg-arm64.img",
+			checksums = "https://cloud-images.ubuntu.com/releases/resolute/release/SHA256SUMS",
+			algorithm = "SHA-256",
+			file = "ubuntu-26.04-server-cloudimg-arm64.img",
+			project = "Ubuntu",
+			sizeMb = 900,
+		)
+
 	private val ubuntu2404 =
 		BaseImage(
 			id = "ubuntu-24.04-arm64",
@@ -113,6 +124,7 @@ object Catalog {
 			sizeMb = 600,
 		)
 
+	// Fedora 44 and later keep the kernel only in the Btrfs root, which Minori can't read yet; 43 still has an ext4 /boot.
 	private val fedora43 =
 		BaseImage(
 			id = "fedora-43-arm64",
@@ -184,10 +196,22 @@ object Catalog {
 				access = listOf(Access.Console, Access.Ssh),
 			),
 			Template(
+				id = "ubuntu-26.04",
+				name = "Ubuntu 26.04 LTS",
+				publisher = "Canonical",
+				summary = "The newest long-term support server, with five years of updates.",
+				about = "Ubuntu's official 64-bit Arm server cloud image, checked against Ubuntu's own checksums.",
+				category = StoreCategory.Linux,
+				icon = StoreIcon.Ubuntu,
+				baseImage = ubuntu2604,
+				features = listOf("Ubuntu Server 26.04 LTS", "OpenSSH server", "snap and apt"),
+				access = listOf(Access.Console, Access.Ssh),
+			),
+			Template(
 				id = "ubuntu-24.04",
 				name = "Ubuntu 24.04 LTS",
 				publisher = "Canonical",
-				summary = "Long-term support server, with five years of updates.",
+				summary = "The previous long-term support server, with updates until 2029.",
 				about = "Ubuntu's official 64-bit Arm server cloud image, checked against Ubuntu's own checksums.",
 				category = StoreCategory.Linux,
 				icon = StoreIcon.Ubuntu,
