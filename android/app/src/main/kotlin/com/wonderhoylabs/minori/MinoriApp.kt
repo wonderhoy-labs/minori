@@ -10,6 +10,7 @@ import com.wonderhoylabs.minori.backend.TermuxHypervisor
 import com.wonderhoylabs.minori.model.BackendKind
 import com.wonderhoylabs.minori.net.PortForwarder
 import com.wonderhoylabs.minori.net.TerminalLink
+import com.wonderhoylabs.minori.service.AiriSetup
 import com.wonderhoylabs.minori.service.Helper
 import com.wonderhoylabs.minori.service.Machines
 import com.wonderhoylabs.minori.service.Operations
@@ -60,6 +61,8 @@ class MinoriApp : Application() {
 		val backends = mutableMapOf<BackendKind, Hypervisor>(BackendKind.AVF to AvfHypervisor(this))
 		backends[BackendKind.TERMUX] = TermuxHypervisor(this)
 		if (BuildConfig.DEBUG) backends[BackendKind.DEMO] = DemoHypervisor { demoTarget }
+		// Machines set up for Airi by Minori 0.2 published a port on the phone; Airi now comes through Minori instead.
+		AiriSetup.migrate(vms)
 		machines = Machines(this, vms, PortForwarder(), backends)
 		operations = Operations(this, vms, images)
 		// Before anything that can reach MinoriService, which reads it.

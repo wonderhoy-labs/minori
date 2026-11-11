@@ -1,5 +1,6 @@
 package com.wonderhoylabs.minori.service
 
+import com.wonderhoylabs.minori.model.BackendKind
 import com.wonderhoylabs.minori.model.NetworkSettings
 import com.wonderhoylabs.minori.model.PortForward
 import com.wonderhoylabs.minori.model.VmConfig
@@ -26,10 +27,37 @@ class AiriSetupTest {
 	}
 
 	@Test
-	fun knowsAMachineThatGivesAiriItsPort() {
-		val plain = VmConfig(name = "Debian")
+	fun needsMinorisAgentAndNoTermux() {
+		assertFalse(AiriSetup.canSetUp(VmConfig(name = "Debian")))
+		assertTrue(AiriSetup.canSetUp(VmConfig(name = "Debian", agent = true)))
+		assertFalse(AiriSetup.canSetUp(VmConfig(name = "Debian", agent = true, backend = BackendKind.TERMUX)))
+	}
+
+	@Test
+	fun knowsAMachineAiriIsSetUpIn() {
+		val plain = VmConfig(name = "Debian", agent = true)
 		assertFalse(AiriSetup.isSetUp(plain))
-		val forward = PortForward(hostPort = AiriSetup.PORT, guestPort = AiriSetup.PORT)
-		assertTrue(AiriSetup.isSetUp(plain.copy(network = NetworkSettings(forwards = listOf(forward)))))
+		assertTrue(AiriSetup.isSetUp(plain.copy(airi = true)))
+		assertFalse(AiriSetup.isSetUp(plain.copy(airi = true, agent = false)))
+	}
+
+	@Test
+	fun movesMinori02sPhonePortToTheFlag() {
+		val legacy = PortForward(label = "Airi", hostPort = AiriSetup.PORT, guestPort = AiriSetup.PORT)
+		val ssh = PortForward(label = "SSH", hostPort = 2222, guestPort = 22)
+		val vm = VmConfig(name = "Debian", agent = true, network = NetworkSettings(forwards = listOf(ssh, legacy)))
+		assertTrue(AiriSetup.isSetUp(vm))
+		val moved = AiriSetup.markSetUp(vm)
+		assertTrue(moved.airi)
+		assertEquals(listOf(ssh), moved.network.forwards)
+		assertTrue(AiriSetup.isSetUp(moved))
+	}
+
+	@Test
+	fun leavesAPortTheUserPublishedThemselves() {
+		val own = PortForward(label = "Mine", hostPort = AiriSetup.PORT, guestPort = AiriSetup.PORT)
+		val vm = VmConfig(name = "Debian", agent = true, network = NetworkSettings(forwards = listOf(own)))
+		assertFalse(AiriSetup.isSetUp(vm))
+		assertEquals(listOf(own), AiriSetup.markSetUp(vm).network.forwards)
 	}
 }

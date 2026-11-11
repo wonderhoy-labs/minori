@@ -140,7 +140,7 @@ dependencies {
 	implementation("org.lsposed.hiddenapibypass:hiddenapibypass:6.2")
 	implementation("com.github.mwiede:jsch:2.28.8")
 	// Airi's client: whether Airi is installed, and its Linux apps on the launcher.
-	implementation("airi:client:0.2.0@aar")
+	implementation("airi:client:0.4.0@aar")
 
 	testImplementation("junit:junit:4.13.2")
 	testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
