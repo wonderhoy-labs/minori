@@ -26,7 +26,7 @@ object AiriSetup {
 	const val PORT = 47821
 	private const val LEGACY_LABEL = "Airi"
 	private const val LOOP_ASSET = "minori-airi.sh"
-	private const val START_TIMEOUT_MS = 5 * 60 * 1000L
+	private const val SSH_TIMEOUT_MS = 2 * 60 * 1000L
 	private const val POLL_MS = 1000L
 	private val TOKEN = Regex("\\b[0-9a-fA-F]{64}\\b")
 
@@ -94,16 +94,27 @@ object AiriSetup {
 			job.step = "Starting ${vm.name}"
 			app.machines.start(vm.id)
 		}
-		val deadline = System.currentTimeMillis() + START_TIMEOUT_MS
+		// Starting has its own time limit in each backend, and a Termux machine's first start, which installs its
+		// distribution, can take many minutes. Only the wait for SSH once it runs is limited here.
+		var deadline = Long.MAX_VALUE
 		while (System.currentTimeMillis() < deadline) {
-			val state = app.machines.state(vm.id)
-			if (state is VmState.Failed) throw IOException(state.message)
-			val guest = app.machines.guest(vm.id)
-			if (guest != null && guest.listeningPorts()?.contains(vm.access.sshPort) != false) return guest
-			job.step = "Waiting for ${vm.name} to start"
+			when (val state = app.machines.state(vm.id)) {
+				is VmState.Failed -> throw IOException(state.message)
+
+				VmState.Stopped, VmState.Stopping -> throw IOException("${vm.name} stopped")
+
+				VmState.Starting -> job.step = "Waiting for ${vm.name} to start"
+
+				VmState.Running -> {
+					val guest = app.machines.guest(vm.id)
+					if (guest != null && guest.listeningPorts()?.contains(vm.access.sshPort) != false) return guest
+					if (deadline == Long.MAX_VALUE) deadline = System.currentTimeMillis() + SSH_TIMEOUT_MS
+					job.step = "Waiting for ${vm.name}'s SSH server"
+				}
+			}
 			Thread.sleep(POLL_MS)
 		}
-		throw IOException("${vm.name} didn't start in time")
+		throw IOException("${vm.name}'s SSH server didn't answer")
 	}
 
 	/** The agent and installer from the installed Airi app's own package. */
