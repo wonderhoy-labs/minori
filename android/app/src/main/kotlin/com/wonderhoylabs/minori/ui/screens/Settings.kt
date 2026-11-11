@@ -66,12 +66,15 @@ fun SettingsTab(model: AppModel) {
 		onPauseOrDispose {}
 	}
 	val privileges = remember(refresh) { Privileges.state(context) }
-	val termuxPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh++ }
+	val termuxPermission = rememberTermuxPermission(model) { refresh++ }
 	val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh++ }
 	val avf = remember(refresh) { app.machines.availability(BackendKind.AVF) }
 	val termux = remember(refresh) { app.machines.availability(BackendKind.TERMUX) }
 	val termuxAllowed =
 		context.checkSelfPermission(TermuxHypervisor.RUN_COMMAND_PERMISSION) == PackageManager.PERMISSION_GRANTED
+	val termuxInstalled =
+		remember(refresh) { runCatching { context.packageManager.getPackageInfo(TermuxHypervisor.TERMUX, 0) }.isSuccess }
+	val termuxOffersCommands = remember(refresh) { TermuxHypervisor.offersRunCommand(context) }
 	val notificationsAllowed =
 		Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
 			context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
@@ -102,7 +105,17 @@ fun SettingsTab(model: AppModel) {
 		}
 		Panel(title = "Termux") {
 			Status(termux == Availability.Ready, "Linux in Termux", (termux as? Availability.Unavailable)?.reason ?: "Ready")
-			if (!termuxAllowed) {
+			if (termuxInstalled && !termuxOffersCommands) {
+				Text(
+					"Uninstall it, which deletes what's in Termux, then install Termux from F-Droid. They're signed " +
+						"differently, so one can't update the other.",
+					style = MaterialTheme.typography.bodySmall,
+					color = MaterialTheme.colorScheme.onSurfaceVariant,
+				)
+				FilledTonalButton(onClick = {
+					context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(TermuxHypervisor.FDROID_URL)))
+				}) { Text("Termux on F-Droid") }
+			} else if (termuxInstalled && !termuxAllowed) {
 				FilledTonalButton(onClick = {
 					termuxPermission.launch(TermuxHypervisor.RUN_COMMAND_PERMISSION)
 				}) { Text("Allow Minori to use Termux") }
@@ -160,6 +173,32 @@ fun SettingsTab(model: AppModel) {
 				Text("  Source code")
 			}
 		}
+	}
+}
+
+/**
+ * Asks for Termux's `RUN_COMMAND` permission, and says so when Android doesn't grant it. Once someone has said no
+ * twice, Android stops showing the dialog and answers no at once, so Minori opens its app info page, where it's under
+ * Permissions as "Run commands in Termux environment".
+ */
+@Composable
+fun rememberTermuxPermission(model: AppModel, then: () -> Unit) = LocalContext.current.let { context ->
+	rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+		then()
+		if (granted) return@rememberLauncherForActivityResult
+		if (!TermuxHypervisor.offersRunCommand(context)) {
+			model.message.value = TermuxHypervisor.PLAY_BUILD_REASON
+			return@rememberLauncherForActivityResult
+		}
+		model.message.value =
+			"Android didn't give Minori the permission. Allow \"Run commands in Termux environment\" in Minori's " +
+			"permissions."
+		context.startActivity(
+			Intent(
+				android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+				Uri.fromParts("package", context.packageName, null),
+			),
+		)
 	}
 }
 

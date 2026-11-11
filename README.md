@@ -43,7 +43,8 @@ on the emulator against real guests. [What has been tested](#what-has-been-teste
   - a computer with [adb](https://developer.android.com/tools/adb) and USB debugging turned on.
 - 64-bit Arm (`aarch64`, `arm64`) guests. A phone can't run x86-64 images or Windows.
 - Space: a Debian VM takes about 1.2 GB to start with.
-- For the Termux backend instead: [Termux](https://termux.dev) from F-Droid or its GitHub releases.
+- For the Termux backend instead: [Termux](https://termux.dev) from F-Droid or its GitHub releases. Google Play's
+  Termux is a different app that doesn't let other apps run commands, so Minori can't use it, and says so in Settings.
 
 ## Install
 
@@ -51,7 +52,7 @@ Download the APK from [Releases](https://github.com/wonderhoy-labs/minori/releas
 install it with `adb`:
 
 ```bash
-adb install -r minori-v0.2.0.apk
+adb install -r minori-v0.2.1.apk
 ```
 
 Then open Minori; its setup screen grants the two permissions virtual machines need, with Shizuku or a command for
@@ -140,7 +141,7 @@ sparse raw disk, extract a bootable kernel and initrd, write cloud-init seeds, a
 archives. Add it by the release tag:
 
 ```toml
-minori-core = { git = "https://github.com/wonderhoy-labs/minori", tag = "v0.2.0" }
+minori-core = { git = "https://github.com/wonderhoy-labs/minori", tag = "v0.2.1" }
 ```
 
 ```rust
@@ -162,7 +163,7 @@ machines, start and stop them, read their ports, and open a guest port, the cons
 draws a machine's desktop on a canvas, with mouse and keyboard. It has no dependencies; add it by the release's URL:
 
 ```json
-"@wonderhoy-labs/minori": "https://github.com/wonderhoy-labs/minori/releases/download/v0.2.0/wonderhoy-labs-minori-0.2.0.tgz"
+"@wonderhoy-labs/minori": "https://github.com/wonderhoy-labs/minori/releases/download/v0.2.1/wonderhoy-labs-minori-0.2.1.tgz"
 ```
 
 ```ts
@@ -220,6 +221,7 @@ debug build's demo backend pointed at real guests: Debian 13 in QEMU, and Debian
 | Minori's own desktop viewer on that machine: picture, taps, KDE's menu, sideways                  | Pixel 10 Pro                                | Pass after a fix; 0.1.0's viewer closed at once with "Operation not supported on transport endpoint" |
 | **Xfce from the store**, 0.2.0's release build: download, first boot, internet through Minori, Xfce in Minori's viewer | Pixel 10 Pro, on Wi-Fi | Pass; setup finished in about 5 minutes |
 | Asahi with Minori as a source: the Xfce machine's desktop with a mouse, and its console | Pixel 10 Pro, Asahi's dev server in Chrome | Pass |
+| Termux with Google Play's Termux (`googleplay.2026.10.09`) installed: Settings explains it and links to F-Droid | Pixel 10 Pro | Pass; 0.2.0's **Allow Minori to use Termux** did nothing |
 
 **Never run:**
 
@@ -283,6 +285,10 @@ share one interface, so the rest of the app doesn't care which one runs a machin
 - The Shizuku helper only runs `pm grant` for Minori's own two permissions, then `am start` to reopen Minori.
 
 ## Troubleshooting
+
+**"Allow Minori to use Termux" does nothing,** in 0.2.0. Your Termux is probably Google Play's, which doesn't have the
+permission Minori asks for, so Android skips the request. Since 0.2.1 Settings says so. Minori needs Termux from F-Droid
+or its GitHub releases; uninstall the Play one first, which deletes what's in it.
 
 **"This device doesn't have Android's Virtualization Framework."** Minori needs a phone with AVF, such as a Pixel 6 or
 newer on Android 14 or later. Emulators don't have it. Use the Termux backend instead.
