@@ -63,7 +63,7 @@ class AiriProvider : ContentProvider() {
 		val guest = app.machines.guest(id) ?: throw FileNotFoundException("${vm.name} isn't running")
 		val remote =
 			try {
-				guest.connect(AiriSetup.PORT)
+				guest.connect(AiriSetup.agentPort(vm))
 			} catch (error: IOException) {
 				throw FileNotFoundException("Airi's agent isn't answering in ${vm.name}: ${error.message}")
 			}

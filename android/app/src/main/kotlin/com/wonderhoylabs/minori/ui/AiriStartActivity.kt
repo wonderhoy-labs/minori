@@ -21,7 +21,9 @@ class AiriStartActivity : Activity() {
 		when {
 			vm == null -> Toast.makeText(this, getString(R.string.airi_no_machine), Toast.LENGTH_LONG).show()
 
-			!AiriSetup.isSetUp(vm) -> Toast.makeText(this, getString(R.string.app_link_needs_airi, vm.name), Toast.LENGTH_LONG).show()
+			!AiriSetup.isSetUp(
+				vm,
+			) -> Toast.makeText(this, getString(R.string.app_link_needs_airi, vm.name), Toast.LENGTH_LONG).show()
 
 			else -> app.machines.start(vm.id)
 		}

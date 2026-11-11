@@ -14,13 +14,15 @@ class AiriProviderTest {
 		val ready = VmConfig(id = "a1", name = "Xfce, at home", agent = true, airi = true)
 		val notYet = VmConfig(id = "b2", name = "Debian", agent = true)
 		val noAgent = VmConfig(id = "c3", name = "Bare")
-		val termux = VmConfig(id = "d4", name = "Termux", agent = true, backend = BackendKind.TERMUX)
+		val termux = VmConfig(id = "d4", name = "Termux", backend = BackendKind.TERMUX, distro = "debian", airi = true)
+		val alpine = VmConfig(id = "e5", name = "Alpine", backend = BackendKind.TERMUX, distro = "alpine")
 		val states = mapOf("a1" to VmState.Running, "b2" to VmState.Failed("No"))
-		val rows = AiriProvider.rows(listOf(ready, notYet, noAgent, termux)) { states[it] ?: VmState.Stopped }
+		val rows = AiriProvider.rows(listOf(ready, notYet, noAgent, termux, alpine)) { states[it] ?: VmState.Stopped }
 		assertArrayEquals(arrayOf("id", "state", "airi", "name"), AiriProvider.COLUMNS)
-		assertEquals(2, rows.size)
+		assertEquals(3, rows.size)
 		assertArrayEquals(arrayOf<Any>("a1", "running", 1, "Xfce, at home"), rows[0])
 		assertArrayEquals(arrayOf<Any>("b2", "error", 0, "Debian"), rows[1])
+		assertArrayEquals(arrayOf<Any>("d4", "stopped", 1, "Termux"), rows[2])
 	}
 
 	@Test

@@ -6,6 +6,7 @@ import com.wonderhoylabs.minori.model.PortForward
 import com.wonderhoylabs.minori.model.VmConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -27,10 +28,21 @@ class AiriSetupTest {
 	}
 
 	@Test
-	fun needsMinorisAgentAndNoTermux() {
+	fun aVmNeedsMinorisAgent() {
 		assertFalse(AiriSetup.canSetUp(VmConfig(name = "Debian")))
 		assertTrue(AiriSetup.canSetUp(VmConfig(name = "Debian", agent = true)))
-		assertFalse(AiriSetup.canSetUp(VmConfig(name = "Debian", agent = true, backend = BackendKind.TERMUX)))
+		assertEquals(AiriSetup.PORT, AiriSetup.agentPort(VmConfig(name = "Debian", agent = true)))
+	}
+
+	@Test
+	fun aTermuxMachineNeedsGlibcAndGetsItsOwnPort() {
+		val debian = VmConfig(id = "t1", name = "Debian", backend = BackendKind.TERMUX, distro = "debian")
+		assertTrue(AiriSetup.canSetUp(debian))
+		assertFalse(AiriSetup.canSetUp(debian.copy(distro = "alpine")))
+		val port = AiriSetup.agentPort(debian)
+		assertTrue(port in 30000 until 40000)
+		assertEquals(port, AiriSetup.agentPort(debian.copy(name = "Renamed")))
+		assertNotEquals(port, AiriSetup.agentPort(debian.copy(id = "t2")))
 	}
 
 	@Test

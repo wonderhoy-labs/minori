@@ -5,6 +5,7 @@ import android.content.Intent
 import com.wonderhoylabs.airi.client.Airi
 import com.wonderhoylabs.minori.MinoriApp
 import com.wonderhoylabs.minori.backend.RunningGuest
+import com.wonderhoylabs.minori.backend.TermuxHypervisor
 import com.wonderhoylabs.minori.model.BackendKind
 import com.wonderhoylabs.minori.model.VmConfig
 import com.wonderhoylabs.minori.model.VmState
@@ -21,9 +22,10 @@ import java.util.zip.ZipFile
  * published on the phone and Android's own terminal can run Airi's agent at the same time.
  */
 object AiriSetup {
-	/** The port Airi's agent listens on inside the guest. */
+	/** The port Airi's agent listens on inside a VM. */
 	const val PORT = 47821
 	private const val LEGACY_LABEL = "Airi"
+	private const val LOOP_ASSET = "minori-airi.sh"
 	private const val START_TIMEOUT_MS = 5 * 60 * 1000L
 	private const val POLL_MS = 1000L
 	private val TOKEN = Regex("\\b[0-9a-fA-F]{64}\\b")
@@ -39,8 +41,17 @@ object AiriSetup {
 	/** The token in Airi's setup command, `sh …/install.sh <token>`, or a bare token, or null if there isn't one. */
 	fun token(command: String): String? = TOKEN.find(command)?.value?.lowercase()
 
-	/** Whether Airi's agent could run in [vm]: it needs Minori's guest agent, which a Termux userland doesn't have. */
-	fun canSetUp(vm: VmConfig): Boolean = vm.backend != BackendKind.TERMUX && vm.agent
+	/**
+	 * Whether Airi's agent could run in [vm]. A VM needs Minori's guest agent to reach it; a Termux userland is on the
+	 * phone's own loopback, but needs a distribution with glibc.
+	 */
+	fun canSetUp(vm: VmConfig): Boolean = when (vm.backend) {
+		BackendKind.TERMUX -> TermuxHypervisor.DISTROS.firstOrNull { it.id == vm.distro }?.airiLibraries != null
+		else -> vm.agent
+	}
+
+	/** The port Airi's agent listens on in [vm]: its own one in a Termux machine, which shares the phone's loopback. */
+	fun agentPort(vm: VmConfig): Int = if (vm.backend == BackendKind.TERMUX) TermuxHypervisor.airiPort(vm) else PORT
 
 	/** Whether Airi's agent is installed in [vm]. */
 	fun isSetUp(vm: VmConfig): Boolean = canSetUp(vm) && (vm.airi || legacyForward(vm))
@@ -115,30 +126,79 @@ object AiriSetup {
 		job.step = "Taking the agent from Airi"
 		val (agent, installer) = agentFiles(context)
 		val dir = vms.dir(vm.id)
-		val key = File(dir, "ssh/id_rsa").takeIf { it.exists() }?.readText()
+		val termux = vm.backend == BackendKind.TERMUX
+		val key = File(dir, "ssh/id_rsa").takeIf { it.exists() && !termux }?.readText()
 
 		fun run(command: String, stdin: ByteArray? = null): Ssh.Result = Ssh.run(
-			hostAlias = "vm-${vm.id}.minori",
-			user = vm.access.user,
+			// The same name and user as Minori's own console for each kind of machine, so the host key it saw matches.
+			hostAlias = if (termux) "termux-${vm.id}" else "vm-${vm.id}.minori",
+			user = if (termux) "root" else vm.access.user,
 			password = vm.access.password,
 			privateKey = key,
 			knownHosts = File(dir, "ssh/known_hosts"),
-			open = { guest.connect(vm.access.sshPort) },
+			open = { guest.connect(if (termux) TermuxHypervisor(context).port(vm) else vm.access.sshPort) },
 			// A key seen for the first time is trusted, as Minori's own SSH screen would on a yes; a changed one isn't.
 			confirmHostKey = { message -> "can't be established" in message },
 			command = command,
 			stdin = stdin,
 		)
-		// Airi's installer deletes the folder it runs from when it's done.
-		val folder = "\$HOME/.cache/minori-airi"
-		job.step = "Copying Airi's agent into ${vm.name}"
-		check(run("mkdir -p $folder && cat > $folder/airi-agent", agent), "copy Airi's agent")
-		check(run("cat > $folder/install.sh", installer), "copy Airi's installer")
-		job.step = "Running Airi's installer"
-		val result = run("sh $folder/install.sh $token")
-		check(result, "install Airi's agent")
+		val output =
+			if (termux) {
+				installInTermux(context, vm, agent, token, job, ::run)
+			} else {
+				// Airi's installer deletes the folder it runs from when it's done.
+				val folder = "\$HOME/.cache/minori-airi"
+				job.step = "Copying Airi's agent into ${vm.name}"
+				check(run("mkdir -p $folder && cat > $folder/airi-agent", agent), "copy Airi's agent")
+				check(run("cat > $folder/install.sh", installer), "copy Airi's installer")
+				job.step = "Running Airi's installer"
+				run("sh $folder/install.sh $token").also { check(it, "install Airi's agent") }.output
+			}
 		vms.update(vm.id) { markSetUp(it) }
-		return result.output.trim()
+		return output.trim()
+	}
+
+	/**
+	 * A Termux machine has no systemd for Airi's installer to use, and shares the phone's loopback, so Minori installs
+	 * the agent itself, with the libraries it needs, and runs it on the machine's own port with the minori-airi loop,
+	 * now and each time the machine starts.
+	 */
+	private fun installInTermux(
+		context: Context,
+		vm: VmConfig,
+		agent: ByteArray,
+		token: String,
+		job: Job,
+		run: (String, ByteArray?) -> Ssh.Result,
+	): String {
+		val distro = TermuxHypervisor.DISTROS.firstOrNull { it.id == vm.distro }
+		val libraries =
+			distro?.airiLibraries ?: throw IOException("Airi's agent doesn't run on ${distro?.name ?: "this"} Linux.")
+		job.step = "Installing what Airi needs in ${vm.name}"
+		val packages = run(libraries, null)
+		check(packages, "install the libraries Airi needs")
+		job.step = "Copying Airi's agent into ${vm.name}"
+		check(
+			run(
+				"mkdir -p \$HOME/.local/bin && cat > \$HOME/.local/bin/airi-agent && chmod 755 \$HOME/.local/bin/airi-agent",
+				agent,
+			),
+			"copy Airi's agent",
+		)
+		val loop = context.assets.open(LOOP_ASSET).use { it.readBytes() }
+		check(
+			run("cat > ${TermuxHypervisor.AIRI_LOOP} && chmod 755 ${TermuxHypervisor.AIRI_LOOP}", loop),
+			"copy Minori's loop for Airi",
+		)
+		check(
+			run("mkdir -p \$HOME/.config/airi && (umask 077 && printf '%s\\n' $token > \$HOME/.config/airi/token)", null),
+			"save Airi's token",
+		)
+		job.step = "Starting Airi's agent"
+		val port = TermuxHypervisor.airiPort(vm)
+		val ssh = TermuxHypervisor(context).port(vm)
+		check(run("nohup ${TermuxHypervisor.AIRI_LOOP} $port $ssh >/dev/null 2>&1 &", null), "start Airi's agent")
+		return packages.output.lines().takeLast(2).joinToString("\n")
 	}
 
 	private fun check(result: Ssh.Result, what: String) {
