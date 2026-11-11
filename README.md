@@ -41,11 +41,15 @@ says exactly what ran.
 
 ## Install
 
-There's no release yet. To build from source, see [Development](#development), then:
+Download the APK from [Releases](https://github.com/wonderhoy-labs/minori/releases) and open it on your phone, or
+install it with `adb`:
 
 ```bash
-adb install android/app/build/outputs/apk/release/app-release.apk
+adb install -r minori-v0.1.0.apk
 ```
+
+Then open Minori; its setup screen grants the two permissions virtual machines need, with Shizuku or a command for
+`adb`. You can also [build it yourself](#development).
 
 ## Use it
 
