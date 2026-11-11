@@ -270,13 +270,14 @@ object Catalog {
 		val target = File(dir, base.file)
 		val partial = File(dir, "${base.file}.part")
 		job.step = "Getting the checksum list from ${base.project}"
-		val sums = URL(base.checksums).readText()
+		val sums = retrying(base.project, job) { fetchText(base.checksums) }
 		val expected =
 			sums
 				.lines()
 				.firstNotNullOfOrNull { line -> checksumFor(line, base.file) }
 				?: throw IOException("${base.project}'s checksum list doesn't mention ${base.file}")
-		download(base.url, partial, job, base.project)
+		// A retry resumes where the last try stopped, and asks the project's redirector for a mirror again.
+		retrying(base.project, job) { download(base.url, partial, job, base.project) }
 		job.step = "Checking the download"
 		val digest = MessageDigest.getInstance(base.algorithm)
 		partial.inputStream().use { input ->
@@ -322,11 +323,57 @@ object Catalog {
 		return null
 	}
 
+	private const val CONNECT_TIMEOUT_MS = 10_000
+	private const val READ_TIMEOUT_MS = 30_000
+	private const val TRIES = 4
+	private const val RETRY_DELAY_MS = 2_000L
+
+	/**
+	 * Runs [attempt] up to [TRIES] times while the network fails. Projects send downloads to mirrors near you, and now
+	 * and then one of them can't be reached from a phone's network; asking again usually gets another.
+	 */
+	private fun <T> retrying(project: String, job: Job, attempt: () -> T): T {
+		var last: IOException? = null
+		repeat(TRIES) { tryNumber ->
+			job.check()
+			try {
+				return attempt()
+			} catch (error: java.net.SocketTimeoutException) {
+				last = error
+			} catch (error: java.net.ConnectException) {
+				last = error
+			} catch (error: java.net.UnknownHostException) {
+				last = error
+			} catch (error: java.net.SocketException) {
+				last = error
+			}
+			if (tryNumber < TRIES - 1) {
+				job.step = "$project's server didn't answer. Trying again"
+				Thread.sleep(RETRY_DELAY_MS)
+			}
+		}
+		throw IOException(
+			"Couldn't reach $project's download server: ${last?.message}. Check the phone's connection and try again.",
+			last,
+		)
+	}
+
+	private fun fetchText(url: String): String {
+		val connection = URL(url).openConnection() as HttpURLConnection
+		connection.connectTimeout = CONNECT_TIMEOUT_MS
+		connection.readTimeout = READ_TIMEOUT_MS
+		try {
+			return connection.inputStream.use { String(it.readBytes(), Charsets.UTF_8) }
+		} finally {
+			connection.disconnect()
+		}
+	}
+
 	private fun download(url: String, partial: File, job: Job, project: String) {
 		var have = if (partial.exists()) partial.length() else 0L
 		val connection = URL(url).openConnection() as HttpURLConnection
-		connection.connectTimeout = 20_000
-		connection.readTimeout = 60_000
+		connection.connectTimeout = CONNECT_TIMEOUT_MS
+		connection.readTimeout = READ_TIMEOUT_MS
 		connection.instanceFollowRedirects = true
 		if (have > 0) connection.setRequestProperty("Range", "bytes=$have-")
 		connection.connect()
