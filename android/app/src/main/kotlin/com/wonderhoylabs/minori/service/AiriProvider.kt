@@ -32,7 +32,7 @@ import kotlin.concurrent.thread
 class AiriProvider : ContentProvider() {
 	override fun onCreate(): Boolean = true
 
-	private val app: MinoriApp get() = MinoriApp.get(context!!)
+	private val app: MinoriApp get() = MinoriApp.get(context!!).also(MinoriApp::awaitReady)
 
 	private fun checkCaller() {
 		val uid = Binder.getCallingUid()

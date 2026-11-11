@@ -53,6 +53,16 @@ class MinoriApp : Application() {
 	lateinit var helper: Helper
 		private set
 
+	private val ready = java.util.concurrent.CountDownLatch(1)
+
+	/**
+	 * Waits until [onCreate] has set everything up. Android starts content providers first, and a provider's calls
+	 * arrive on other threads, so they can come in before it has.
+	 */
+	fun awaitReady() {
+		ready.await()
+	}
+
 	override fun onCreate() {
 		super.onCreate()
 		HiddenApi.exempt()
@@ -69,6 +79,7 @@ class MinoriApp : Application() {
 		terminal = TerminalLink(this)
 		helper = Helper(this).also { it.start() }
 		terminal.resume()
+		ready.countDown()
 	}
 
 	companion object {
