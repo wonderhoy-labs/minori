@@ -31,6 +31,8 @@ data class TermuxDistro(
 	val airiLibraries: String? = null,
 	/** Why proot-distro can't install it on this phone, or null when it can. */
 	val unavailable: String? = null,
+	/** How Termux installs it, if not from proot-distro's own image of the same name. */
+	val install: String = "proot-distro install $id",
 )
 
 /**
@@ -159,7 +161,7 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 				airi + desktopLoop +
 				"exec /usr/sbin/sshd -D -p $port -o PermitRootLogin=yes -o PasswordAuthentication=yes -o ListenAddress=127.0.0.1"
 		return "set -e; command -v proot-distro >/dev/null || pkg install -y proot-distro; " +
-			"proot-distro login ${distro.id} -- true 2>/dev/null || proot-distro install ${distro.id}; " +
+			"proot-distro login ${distro.id} -- true 2>/dev/null || (${distro.install}); " +
 			"proot-distro login ${distro.id} -- sh -c \"$inside\""
 	}
 
@@ -250,6 +252,24 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 		private const val SET_UP_MARKER = "termux-set-up"
 		private const val CHECK_TIMEOUT_MS = 8_000L
 
+		/**
+		 * proot-distro's own Arch comes from Docker Hub's archlinux image, which is x86-64 only, so Arch comes from Arch
+		 * Linux ARM's aarch64 root filesystem instead. Its site has no HTTPS, so the tarball has to carry a good
+		 * signature from the Arch Linux ARM Build System key, whose fingerprint archlinuxarm.org publishes over HTTPS. gpg
+		 * comes with its libgcrypt, since a Termux that updated one and not the other has a gpg that won't start.
+		 */
+		private const val ARCH_KEY = "68B3537F39A313B3E574D06777193F152BDBE6A6"
+		private const val ARCH_TARBALL = "ArchLinuxARM-aarch64-latest.tar.gz"
+		private const val ARCH_INSTALL =
+			"set +e; cd \"\$TMPDIR\" && pkg install -y gnupg libgcrypt && " +
+				"curl -fL -o $ARCH_TARBALL http://os.archlinuxarm.org/os/$ARCH_TARBALL && " +
+				"curl -fL -o $ARCH_TARBALL.sig http://os.archlinuxarm.org/os/$ARCH_TARBALL.sig && " +
+				"export GNUPGHOME=\"\$(mktemp -d)\" && " +
+				"curl -fsS 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x$ARCH_KEY' | gpg -q --import && " +
+				"gpg --status-fd 1 --verify $ARCH_TARBALL.sig $ARCH_TARBALL | grep -q 'VALIDSIG $ARCH_KEY' && " +
+				"proot-distro install ./$ARCH_TARBALL --name archlinux; " +
+				"status=\$?; rm -rf $ARCH_TARBALL $ARCH_TARBALL.sig \"\$GNUPGHOME\"; exit \$status"
+
 		private const val APT_AIRI = "apt-get update && apt-get install -y libpixman-1-0 libxkbcommon0 xkb-data"
 
 		/**
@@ -281,12 +301,13 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 				TermuxDistro(
 					"archlinux",
 					"Arch Linux",
-					"(command -v sshd >/dev/null || pacman -Sy --noconfirm openssh)",
+					// pacman sandboxes itself with Landlock, which proot can't give it, and its keyring starts empty.
+					"(command -v sshd >/dev/null || ((grep -q '^DisableSandbox' /etc/pacman.conf || " +
+						"sed -i '/^\\[options\\]/a DisableSandbox' /etc/pacman.conf) && " +
+						"(test -s /etc/pacman.d/gnupg/pubring.gpg || (pacman-key --init && pacman-key --populate archlinuxarm)) && " +
+						"pacman -Sy --noconfirm openssh))",
 					"pacman -Sy --noconfirm --needed pixman libxkbcommon xkeyboard-config",
-					// proot-distro takes Arch from Docker Hub's archlinux image, which is only built for x86-64.
-					unavailable =
-						"proot-distro only has Arch Linux for x86-64 PCs, not for this phone's 64-bit Arm processor. " +
-							"Pick Debian, Ubuntu, Alpine or Fedora.",
+					install = ARCH_INSTALL,
 				),
 				TermuxDistro("alpine", "Alpine", "(command -v sshd >/dev/null || apk add openssh)"),
 				TermuxDistro(
