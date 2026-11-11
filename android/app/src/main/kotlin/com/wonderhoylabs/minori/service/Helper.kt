@@ -7,7 +7,6 @@ import com.wonderhoylabs.minori.BuildConfig
 import com.wonderhoylabs.minori.MinoriApp
 import com.wonderhoylabs.minori.core.MinoriJson
 import com.wonderhoylabs.minori.model.VmConfig
-import com.wonderhoylabs.minori.model.VmState
 import com.wonderhoylabs.minori.net.PortForwarder
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -176,7 +175,7 @@ class Helper(private val app: MinoriApp) {
 		put("id", vm.id)
 		put("name", vm.name)
 		put("backend", vm.backend.name.lowercase())
-		put("state", stateName(app.machines.state(vm.id)))
+		put("state", AiriProvider.stateName(app.machines.state(vm.id)))
 		vm.os?.let { put("os", it) }
 		put("agent", vm.agent)
 		put("vncPort", vm.access.vncPort)
@@ -209,14 +208,6 @@ class Helper(private val app: MinoriApp) {
 			val listening = app.machines.guest(vm.id)?.listeningPorts()
 			if (listening != null) put("listening", buildJsonArray { listening.forEach { add(JsonPrimitive(it)) } })
 		}
-	}
-
-	private fun stateName(state: VmState): String = when (state) {
-		VmState.Stopped -> "stopped"
-		VmState.Starting -> "starting"
-		VmState.Running -> "running"
-		VmState.Stopping -> "stopping"
-		is VmState.Failed -> "error"
 	}
 
 	private fun result(id: JsonElement?, value: JsonElement) = buildJsonObject {

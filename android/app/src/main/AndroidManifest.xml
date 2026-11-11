@@ -60,6 +60,11 @@
 				<action android:name="android.intent.action.MAIN" />
 				<category android:name="android.intent.category.LAUNCHER" />
 			</intent-filter>
+			<!-- Airi hands over its token, to set Airi up in a machine: see docs/airi.md. -->
+			<intent-filter>
+				<action android:name="com.wonderhoylabs.minori.action.SET_UP_AIRI" />
+				<category android:name="android.intent.category.DEFAULT" />
+			</intent-filter>
 			<!-- minori://vm/<id>[/console|ssh|vnc] opens a machine's page or one of its screens. It never starts anything. -->
 			<intent-filter>
 				<action android:name="android.intent.action.VIEW" />
@@ -69,6 +74,32 @@
 					android:scheme="minori" />
 			</intent-filter>
 		</activity>
+
+		<!--
+			Airi starts a stopped machine through this when one of its apps is opened. It shows nothing, and only starts
+			machines that Airi is set up in, which minori://vm/<id>/app/<desktop id> already lets any app do.
+		-->
+		<activity
+			android:name=".ui.AiriStartActivity"
+			android:excludeFromRecents="true"
+			android:exported="true"
+			android:noHistory="true"
+			android:theme="@android:style/Theme.Translucent.NoTitleBar">
+			<intent-filter>
+				<action android:name="com.wonderhoylabs.minori.action.START_FOR_AIRI" />
+				<category android:name="android.intent.category.DEFAULT" />
+			</intent-filter>
+		</activity>
+
+		<!--
+			Airi lists the machines it can use and reaches its agent in them through this, instead of a port on the phone,
+			so Android's terminal and Minori's machines work together. It checks that the caller is Airi or adb's shell.
+		-->
+		<provider
+			android:name=".service.AiriProvider"
+			android:authorities="com.wonderhoylabs.minori.airi"
+			android:exported="true"
+			tools:ignore="ExportedContentProvider" />
 
 		<!-- adb's shell may start it, to wake Minori for a page; DUMP is held by the shell, not by apps. -->
 		<service

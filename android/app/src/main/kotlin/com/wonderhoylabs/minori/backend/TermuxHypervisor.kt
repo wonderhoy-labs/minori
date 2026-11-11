@@ -19,8 +19,11 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
-/** A Linux userland Termux's proot-distro can install, and how to put an SSH server in it. */
-data class TermuxDistro(val id: String, val name: String, val installSsh: String)
+/**
+ * A Linux userland Termux's proot-distro can install, and how to put an SSH server in it. [airiLibraries] installs what
+ * Airi's agent needs (glibc, pixman and xkbcommon); it's null where the agent can't run, as on Alpine's musl.
+ */
+data class TermuxDistro(val id: String, val name: String, val installSsh: String, val airiLibraries: String? = null)
 
 /**
  * Machines that are proot-distro userlands in Termux, for phones without AVF. They share the phone's kernel and
@@ -56,7 +59,7 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 		val firstRun = !File(dir, SET_UP_MARKER).exists()
 		// Termux answers through a PendingIntent when it refuses a command or the command ends. sshd -D doesn't end,
 		// so any answer before the port opens means something went wrong, and it says what.
-		val ended = run(script(distro, port, password), background = !firstRun)
+		val ended = run(script(distro, port, password, if (vm.airi) airiPort(vm) else null), background = !firstRun)
 		val deadline = System.currentTimeMillis() + if (firstRun) SETUP_TIMEOUT_MS else START_TIMEOUT_MS
 		while (!listening(port)) {
 			ended.getNow(null)?.let { throw IOException(it.explain(distro)) }
@@ -106,7 +109,12 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 
 			override fun forceStop() {
 				shell.close()
-				runCatching { run("pkill -f 'sshd -D -p $port' || true", background = true) }
+				// Airi's agent and the loop that restarts it go with the machine, or they'd go on running in Termux.
+				val airi = airiPort(vm)
+				val stop =
+					"pkill -f 'sshd -D -p $port'; pkill -f 'minori-airi $airi '; " +
+						"pkill -f 'airi-agent serve --port $airi'; true"
+				runCatching { run(stop, background = true) }
 				events.onStopped(null)
 			}
 		}
@@ -117,9 +125,11 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 		true
 	}.getOrDefault(false)
 
-	private fun script(distro: TermuxDistro, port: Int, password: String): String {
+	private fun script(distro: TermuxDistro, port: Int, password: String, airiPort: Int?): String {
+		// Airi's agent, once Minori has set it up here, runs beside the SSH server: see AiriSetup.
+		val airi = airiPort?.let { "(test ! -x $AIRI_LOOP || (nohup $AIRI_LOOP $it $port >/dev/null 2>&1 &)) && " }.orEmpty()
 		val inside =
-			"${distro.installSsh} && mkdir -p /run/sshd && ssh-keygen -A && echo 'root:$password' | chpasswd && " +
+			"${distro.installSsh} && mkdir -p /run/sshd && ssh-keygen -A && echo 'root:$password' | chpasswd && $airi" +
 				"exec /usr/sbin/sshd -D -p $port -o PermitRootLogin=yes -o PasswordAuthentication=yes -o ListenAddress=127.0.0.1"
 		return "set -e; command -v proot-distro >/dev/null || pkg install -y proot-distro; " +
 			"proot-distro login ${distro.id} -- true 2>/dev/null || proot-distro install ${distro.id}; " +
@@ -200,6 +210,10 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 		fun offersRunCommand(context: Context): Boolean =
 			runCatching { context.packageManager.getPermissionInfo(RUN_COMMAND_PERMISSION, 0) }.isSuccess
 		private const val PORT_BASE = 20000
+		private const val AIRI_PORT_BASE = 30000
+
+		/** Where Minori puts the loop that keeps Airi's agent running in a Termux machine, which has no systemd. */
+		const val AIRI_LOOP = "/root/.local/bin/minori-airi"
 		private const val PORT_RANGE = 10000
 		private const val POLL_MS = 1000L
 		private const val START_TIMEOUT_MS = 30_000L
@@ -207,21 +221,41 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 		private const val SET_UP_MARKER = "termux-set-up"
 		private const val CHECK_TIMEOUT_MS = 8_000L
 
+		private const val APT_AIRI = "apt-get update && apt-get install -y libpixman-1-0 libxkbcommon0 xkb-data"
+
+		/**
+		 * The port Airi's agent listens on in a Termux machine. Termux shares the phone's loopback, so each machine needs
+		 * its own, apart from the 47821 that Android's terminal forwards.
+		 */
+		fun airiPort(vm: VmConfig): Int = AIRI_PORT_BASE + (vm.id.hashCode() and 0x7fffffff) % PORT_RANGE
+
 		val DISTROS =
 			listOf(
 				TermuxDistro(
 					"debian",
 					"Debian",
 					"(command -v sshd >/dev/null || (apt-get update && apt-get install -y openssh-server))",
+					APT_AIRI,
 				),
 				TermuxDistro(
 					"ubuntu",
 					"Ubuntu",
 					"(command -v sshd >/dev/null || (apt-get update && apt-get install -y openssh-server))",
+					APT_AIRI,
 				),
-				TermuxDistro("archlinux", "Arch Linux", "(command -v sshd >/dev/null || pacman -Sy --noconfirm openssh)"),
+				TermuxDistro(
+					"archlinux",
+					"Arch Linux",
+					"(command -v sshd >/dev/null || pacman -Sy --noconfirm openssh)",
+					"pacman -Sy --noconfirm --needed pixman libxkbcommon xkeyboard-config",
+				),
 				TermuxDistro("alpine", "Alpine", "(command -v sshd >/dev/null || apk add openssh)"),
-				TermuxDistro("fedora", "Fedora", "(command -v sshd >/dev/null || dnf install -y openssh-server)"),
+				TermuxDistro(
+					"fedora",
+					"Fedora",
+					"(command -v sshd >/dev/null || dnf install -y openssh-server)",
+					"dnf install -y pixman libxkbcommon xkeyboard-config",
+				),
 			)
 	}
 }

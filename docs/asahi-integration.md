@@ -65,8 +65,8 @@ of its screens. They never start anything. A page can send them with `am start -
 
 `minori://vm/<id or name>/app/<desktop file ID>` opens one Linux app from a machine, the way Airi's
 `airi://app/<desktop file ID>` does from Android's terminal, and Airi is what shows it. It needs Airi set up in that
-machine (`airi` is true in `list`). Minori starts the machine if it has to, waits for Airi's agent in it, then opens
-the app; a machine that isn't set up gets a message instead. Asahi shows one alone through Shinonome's
+machine (`airi` is true in `list`). Minori starts the machine if it has to and hands over to Airi's
+`airi://minori/<id>/<desktop file ID>`, which waits for the agent; a machine that isn't set up gets a message instead. Asahi shows one alone through Shinonome's
 `--app minori://vm/<id>/app/<desktop file ID>`. Airi lists the apps while the machine runs: see Airi's README.
 
 ## The library
@@ -100,8 +100,5 @@ hidden, so the page ran as a throttled background tab, and that number says litt
 
 ## Airi and Minori
 
-Airi shows apps from Android's own Linux terminal as Android windows and launcher apps. Minori can put the same agent
-in one of its machines: a machine's page has "Apps on your launcher", which takes the agent and installer from the
-installed Airi app, runs the installer in the guest over SSH with the token from Airi's setup command, and publishes the
-guest's port 47821 on the phone's loopback, where Airi looks. Airi itself doesn't change. Only one of Android's terminal
-and a Minori machine can have that port at a time.
+Airi shows a machine's Linux apps as Android apps, next to Android's own terminal's, and reaches them through Minori's
+`content://com.wonderhoylabs.minori.airi` provider rather than a port on the phone. [airi.md](airi.md) is that contract.

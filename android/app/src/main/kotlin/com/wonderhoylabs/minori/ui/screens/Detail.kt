@@ -81,6 +81,7 @@ import com.wonderhoylabs.minori.model.VmConfig
 import com.wonderhoylabs.minori.model.VmState
 import com.wonderhoylabs.minori.net.Firewall
 import com.wonderhoylabs.minori.net.NetworkState
+import com.wonderhoylabs.minori.service.AiriSetup
 import com.wonderhoylabs.minori.service.Catalog
 import com.wonderhoylabs.minori.service.gib
 import com.wonderhoylabs.minori.store.usage
@@ -213,7 +214,7 @@ fun DetailScreen(model: AppModel, vmId: String) {
 		}
 		if (vm.backend != BackendKind.TERMUX) InternetPanel(vm, running)
 		if (vm.access.password != null) LoginPanel(model, vm, running, desktop)
-		if (vm.backend != BackendKind.TERMUX && vm.agent) AiriPanel(model, vm, running)
+		if (AiriSetup.canSetUp(vm)) AiriPanel(model, vm, running)
 		if (vm.backend != BackendKind.TERMUX) PortsPanel(vm, running, listening, onEdit = { editPort = it })
 		Panel(title = "Machine") {
 			InfoRow(Icons.Rounded.Memory, "Runs as", backendLabel(vm.backend))

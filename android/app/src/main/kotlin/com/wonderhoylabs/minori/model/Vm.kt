@@ -163,6 +163,8 @@ data class VmConfig(
 	val agent: Boolean = false,
 	/** For the Termux backend: the proot-distro name. */
 	val distro: String? = null,
+	/** Whether Airi's agent is installed in the guest, so that Airi lists this machine's apps through Minori. */
+	val airi: Boolean = false,
 ) {
 	val rootDisk: VmDisk? get() = disks.firstOrNull { it.role == DiskRole.ROOT }
 }
