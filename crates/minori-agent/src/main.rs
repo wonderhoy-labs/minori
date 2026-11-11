@@ -9,6 +9,9 @@
 //! - `CONNECT <port>` → `OK`, then the connection's bytes, or `ERR <reason>`
 //! - `UDP <port>` → `OK`, then datagrams both ways, each a big-endian u16 length and its bytes
 //! - `NET` → `OK`, then the guest's IP packets both ways, framed like `UDP`, through the TUN device `minori0`
+//! - `TIME <milliseconds since 1970>` → `OK`, after setting the guest's clock to the phone's if they differ by more
+//!   than a second. A guest under AVF has no clock of its own and starts at its image's build date, which breaks
+//!   TLS and apt until it's set.
 //! - `POWEROFF` → `OK`, then the guest shuts down
 //!
 //! It listens on vsock port 5741. `--tcp <address>` listens on TCP instead, for testing without vsock.
@@ -133,6 +136,13 @@ fn handle<R: Read + Send + 'static, W: Write + Send + 'static>(reader: R, mut wr
 				writeln!(writer, "ERR the guest's internet needs Linux")
 			}
 		}
+		("TIME", millis) => match millis.trim().parse::<i64>() {
+			Ok(millis) => match set_clock(millis) {
+				Ok(()) => writeln!(writer, "OK"),
+				Err(error) => writeln!(writer, "ERR {error}"),
+			},
+			Err(_) => writeln!(writer, "ERR TIME needs milliseconds since 1970"),
+		},
 		("POWEROFF", _) => {
 			writeln!(writer, "OK")?;
 			writer.flush()?;
@@ -245,6 +255,33 @@ fn parse_listening(text: &str) -> Vec<u16> {
 			u16::from_str_radix(port, 16).ok()
 		})
 		.collect()
+}
+
+/// Sets the guest's clock to [millis] since 1970, unless it's already within a second of it.
+fn set_clock(millis: i64) -> io::Result<()> {
+	let now = std::time::SystemTime::now()
+		.duration_since(std::time::UNIX_EPOCH)
+		.map(|elapsed| elapsed.as_millis() as i64)
+		.unwrap_or(0);
+	if (now - millis).abs() <= 1000 {
+		return Ok(());
+	}
+	set_realtime(millis)
+}
+
+#[cfg(target_os = "linux")]
+fn set_realtime(millis: i64) -> io::Result<()> {
+	let time = libc::timespec { tv_sec: millis.div_euclid(1000), tv_nsec: millis.rem_euclid(1000) * 1_000_000 };
+	// SAFETY: clock_settime reads one valid timespec.
+	if unsafe { libc::clock_settime(libc::CLOCK_REALTIME, &time) } != 0 {
+		return Err(io::Error::last_os_error());
+	}
+	Ok(())
+}
+
+#[cfg(not(target_os = "linux"))]
+fn set_realtime(_millis: i64) -> io::Result<()> {
+	Err(io::Error::new(io::ErrorKind::Unsupported, "only on Linux"))
 }
 
 #[cfg(test)]

@@ -38,6 +38,9 @@ class GuestNetwork(private val name: String, private val guest: AgentGuest) {
 					serveOnce()
 				} catch (error: IOException) {
 					Log.i(TAG, "$name's network: ${error.message}")
+				} catch (error: RuntimeException) {
+					// Whatever goes wrong here, the guest keeps running; the network just tries again.
+					Log.w(TAG, "$name's network failed", error)
 				}
 				stateFlow.value = NetworkState.Waiting
 				if (running) runCatching { Thread.sleep(RETRY_MS) }
@@ -46,6 +49,8 @@ class GuestNetwork(private val name: String, private val guest: AgentGuest) {
 		}
 
 	private fun serveOnce() {
+		// The guest has no clock of its own under AVF. Older agents don't know TIME; that's fine.
+		runCatching { guest.agentRequest("TIME ${System.currentTimeMillis()}").close() }
 		val link = guest.agentRequest("NET")
 		connection = link
 		val nat = Native.natStart()

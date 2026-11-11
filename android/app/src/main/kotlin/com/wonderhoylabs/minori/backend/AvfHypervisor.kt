@@ -7,6 +7,7 @@ import android.system.virtualmachine.VirtualMachine
 import android.system.virtualmachine.VirtualMachineCallback
 import android.system.virtualmachine.VirtualMachineConfig
 import android.system.virtualmachine.VirtualMachineCustomImageConfig
+import android.system.virtualmachine.VirtualMachineException
 import android.system.virtualmachine.VirtualMachineManager
 import com.wonderhoylabs.minori.model.BackendKind
 import com.wonderhoylabs.minori.model.CpuMode
@@ -72,6 +73,9 @@ class AvfHypervisor(private val context: Context) : Hypervisor {
 				.setKernelPath(kernel.path)
 				.apply { boot.initrdFile?.let { File(dir, it) }?.takeIf { it.exists() }?.let { setInitrdPath(it.path) } }
 				.apply { boot.cmdline.split(' ').filter { it.isNotBlank() }.forEach { addParam(it) } }
+				// The VM has no network card (its internet comes through the agent, which starts later), so don't
+				// let systemd hold boot for two minutes waiting for one.
+				.apply { if ("wait-online" !in boot.cmdline) addParam(SKIP_WAIT_ONLINE) }
 				.apply {
 					// The boot disk first, so it's /dev/vda, then the rest in the order the user set.
 					val ordered = vm.disks.sortedBy {
@@ -163,7 +167,14 @@ class AvfHypervisor(private val context: Context) : Hypervisor {
 			}
 
 		private fun vsock(port: Long): GuestConnection {
-			val socket = machine.connectVsock(port)
+			// AVF says "no such device" with a VirtualMachineException until something in the guest listens, such as
+			// the agent a few seconds into boot. Callers expect an IOException for that, and retry.
+			val socket =
+				try {
+					machine.connectVsock(port)
+				} catch (error: VirtualMachineException) {
+					throw IOException("Nothing in the guest is listening on vsock port $port yet", error)
+				}
 			val reader = ParcelFileDescriptor.AutoCloseInputStream(socket.dup())
 			val writer = ParcelFileDescriptor.AutoCloseOutputStream(socket)
 			return object : GuestConnection {
@@ -222,3 +233,6 @@ class AvfHypervisor(private val context: Context) : Hypervisor {
 		else -> "The VM stopped (AVF reason $reason)."
 	}
 }
+
+/** Systemd's wait for a network card, which a Minori VM never has. */
+private const val SKIP_WAIT_ONLINE = "systemd.mask=systemd-networkd-wait-online.service"
