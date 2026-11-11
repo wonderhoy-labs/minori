@@ -3,6 +3,8 @@ package com.wonderhoylabs.minori.backend
 import android.content.Context
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.system.Os
+import android.system.OsConstants
 import android.system.virtualmachine.VirtualMachine
 import android.system.virtualmachine.VirtualMachineCallback
 import android.system.virtualmachine.VirtualMachineConfig
@@ -185,6 +187,13 @@ class AvfHypervisor(private val context: Context) : Hypervisor {
 			return object : GuestConnection {
 				override val input: InputStream = reader
 				override val output: OutputStream = writer
+
+				// The reader has its own copy of the descriptor, so closing the writer alone leaves the vsock open and
+				// sends the guest nothing. shutdown does, and the agent passes it on to the guest's service.
+				override fun shutdownOutput() {
+					writer.flush()
+					Os.shutdown(socket.fileDescriptor, OsConstants.SHUT_WR)
+				}
 
 				override fun close() {
 					runCatching { reader.close() }

@@ -188,10 +188,16 @@ class Machines(
 	}
 
 	/** After the user edits a running VM's ports, publishes the new set. */
+	// Changes to ports, one at a time and off the main thread, since reopening one can wait for Android to free it.
+	private val forwardChanges =
+		java.util.concurrent.Executors.newSingleThreadExecutor { Thread(it, "forward-changes").apply { isDaemon = true } }
+
 	fun refreshForwards(id: String) {
-		val vm = store.get(id) ?: return
-		val guest = guests[id] ?: return
-		forwarder.replace(id, vm.network.forwards, guest)
+		forwardChanges.execute {
+			val vm = store.get(id) ?: return@execute
+			val guest = guests[id] ?: return@execute
+			forwarder.replace(id, vm.network.forwards, guest)
+		}
 	}
 
 	fun stopAll() {

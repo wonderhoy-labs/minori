@@ -24,6 +24,7 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketAddress
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit.MILLISECONDS
 import kotlin.concurrent.thread
 
 /** How one published port is doing, for the VM page. */
@@ -93,17 +94,29 @@ class PortForwarder {
 		} else {
 			InetAddress.getByName("::")
 		}
-		return try {
-			when (forward.protocol) {
-				Protocol.TCP -> startTcp(vmId, forward, guest, bind, temporary)
-				Protocol.UDP -> startUdp(vmId, forward, guest, bind, temporary)
+		// After an edit the old listener closes just before the new one opens, and Android can hold the port for a
+		// moment until the thread waiting in accept() lets go, so a port in use is tried again for a little while.
+		val deadline = System.currentTimeMillis() + REBIND_MS
+		while (true) {
+			try {
+				return when (forward.protocol) {
+					Protocol.TCP -> startTcp(vmId, forward, guest, bind, temporary)
+					Protocol.UDP -> startUdp(vmId, forward, guest, bind, temporary)
+				}
+			} catch (error: java.net.BindException) {
+				if (System.currentTimeMillis() > deadline) return failed(vmId, forward, error)
+				Thread.sleep(REBIND_POLL_MS)
+			} catch (error: IOException) {
+				return failed(vmId, forward, error)
 			}
-		} catch (error: IOException) {
-			state.update {
-				it + (forward.id to ForwardStatus(vmId, forward, listening = false, error = describe(error, forward)))
-			}
-			-1
 		}
+	}
+
+	private fun failed(vmId: String, forward: PortForward, error: IOException): Int {
+		state.update {
+			it + (forward.id to ForwardStatus(vmId, forward, listening = false, error = describe(error, forward)))
+		}
+		return -1
 	}
 
 	private fun describe(error: IOException, forward: PortForward): String =
@@ -246,12 +259,19 @@ class PortForwarder {
 
 		/** Copies both ways until both sides close, then calls [done] once. */
 		fun splice(input: InputStream, output: OutputStream, remote: GuestConnection, done: () -> Unit) {
+			val finished = java.util.concurrent.CountDownLatch(1)
 			val upstream =
 				thread(name = "splice-up", isDaemon = true) {
 					runCatching { input.copyTo(remote.output) }
-					runCatching { remote.output.close() }
+					// The client has finished sending. Tell the guest and keep listening for its answer, where that
+					// can be done; Android won't let an app shut down a vsock, so on AVF give the answer a moment and
+					// then end the connection, which the guest's service sees as the client going.
+					if (runCatching { remote.shutdownOutput() }.isFailure && !finished.await(HALF_CLOSE_GRACE_MS, MILLISECONDS)) {
+						runCatching { remote.close() }
+					}
 				}
 			runCatching { remote.input.copyTo(output) }
+			finished.countDown()
 			runCatching { output.close() }
 			upstream.join(SPLICE_LINGER_MS)
 			remote.close()
@@ -259,6 +279,9 @@ class PortForwarder {
 		}
 
 		private const val SPLICE_LINGER_MS = 2000L
+		private const val REBIND_MS = 3000L
+		private const val REBIND_POLL_MS = 150L
+		private const val HALF_CLOSE_GRACE_MS = 3000L
 	}
 }
 

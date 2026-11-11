@@ -62,10 +62,23 @@ class AddressRange private constructor(private val network: ByteArray, private v
 
 /** Decides who may connect to a published port. Deny always wins; an empty allow list allows everyone else. */
 object Firewall {
+	/**
+	 * Whether [address] may connect to [forward]. Deny entries win, the phone's own loopback included if one names it.
+	 * An allow list is for other devices: it doesn't shut out the phone itself, whose apps, and Minori's own SSH and
+	 * Remote Desktop buttons, reach a port over loopback.
+	 */
 	fun allows(forward: PortForward, address: InetAddress): Boolean {
 		if (forward.deny.mapNotNull(AddressRange::parse).any { it.contains(address) }) return false
+		if (address.isLoopbackAddress || isMappedLoopback(address)) return true
 		val allow = forward.allow.mapNotNull(AddressRange::parse)
 		return allow.isEmpty() || allow.any { it.contains(address) }
+	}
+
+	/** ::ffff:127.0.0.1, which is how a dual-stack listener sees the phone's own IPv4 loopback. */
+	private fun isMappedLoopback(address: InetAddress): Boolean {
+		val bytes = address.address
+		return bytes.size == 16 && (0 until 10).all { bytes[it] == 0.toByte() } && bytes[10] == 0xff.toByte() &&
+			bytes[11] == 0xff.toByte() && bytes[12] == 127.toByte()
 	}
 
 	/** The entries in [entries] that aren't valid ranges, to show next to the field. */

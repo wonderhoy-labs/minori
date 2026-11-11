@@ -136,6 +136,8 @@ class DemoHypervisor(private val target: () -> DemoTarget) : Hypervisor {
 				override val input: InputStream = socket.getInputStream()
 				override val output: OutputStream = socket.getOutputStream()
 
+				override fun shutdownOutput() = socket.shutdownOutput()
+
 				override fun close() = socket.close()
 			}
 		}

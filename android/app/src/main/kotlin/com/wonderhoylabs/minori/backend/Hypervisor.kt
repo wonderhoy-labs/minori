@@ -11,6 +11,14 @@ import java.io.OutputStream
 interface GuestConnection : Closeable {
 	val input: InputStream
 	val output: OutputStream
+
+	/**
+	 * Says nothing more is coming, and keeps reading open for the guest's answer: a half-close, the way a TCP client
+	 * ends its request. Closing [output] isn't one everywhere, since a socket's output stream closes the whole socket.
+	 */
+	fun shutdownOutput() {
+		output.close()
+	}
 }
 
 /** A guest's console: what it prints on its serial port, and a way to type into it. */

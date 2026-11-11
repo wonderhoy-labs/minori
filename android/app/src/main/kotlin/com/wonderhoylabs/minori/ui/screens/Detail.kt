@@ -3,7 +3,9 @@ package com.wonderhoylabs.minori.ui.screens
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -313,6 +315,13 @@ fun DetailScreen(model: AppModel, vmId: String) {
 			},
 		)
 	}
+	val localNetwork = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+		app.machines.refreshForwards(vm.id)
+		if (!granted) {
+			model.message.value =
+				"Without access to your local network, Android keeps other devices out. Allow it in Minori's permissions."
+		}
+	}
 	editPort?.let { forward ->
 		PortDialog(
 			initial = forward,
@@ -325,6 +334,9 @@ fun DetailScreen(model: AppModel, vmId: String) {
 				}
 				app.machines.refreshForwards(vm.id)
 				editPort = null
+				if (saved.exposure == Exposure.NETWORK && !localNetworkAllowed(context)) {
+					localNetwork.launch(LOCAL_NETWORK)
+				}
 			},
 			onDelete = {
 				app.vms.update(vm.id) { current ->
@@ -491,7 +503,8 @@ private fun LoginPanel(model: AppModel, vm: VmConfig, running: Boolean, desktop:
 
 @Composable
 private fun PortsPanel(vm: VmConfig, running: Boolean, listening: List<Int>?, onEdit: (PortForward) -> Unit) {
-	val app = MinoriApp.get(LocalContext.current)
+	val context = LocalContext.current
+	val app = MinoriApp.get(context)
 	val forwards by app.machines.forwarder.status.collectAsState()
 	Panel(title = "Ports", action = {
 		IconButton(onClick = { onEdit(PortForward(hostPort = 2222, guestPort = 22, label = "SSH")) }) {
@@ -517,8 +530,14 @@ private fun PortsPanel(vm: VmConfig, running: Boolean, listening: List<Int>?, on
 			Text(
 				when {
 					!forward.enabled -> "Off"
+
+					forward.exposure == Exposure.NETWORK && !localNetworkAllowed(context) ->
+						"Only this phone can connect: Minori needs access to your local network, which Android asks for when you save the port"
+
 					status == null -> if (running) "Not listening" else "Listens while the machine runs"
+
 					status.error != null -> status.error
+
 					else -> "${status.open} open · ${status.served} served · ${status.refused} refused"
 				},
 				style = MaterialTheme.typography.labelMedium,
@@ -689,3 +708,10 @@ private fun TermuxDesktopPanel(model: AppModel, vm: VmConfig, running: Boolean) 
 		}) { Text(if (running) "Add a desktop" else "Start it to add a desktop") }
 	}
 }
+
+/** Android 17's permission for traffic with other devices on the local network, which ports on the network need. */
+private const val LOCAL_NETWORK = "android.permission.ACCESS_LOCAL_NETWORK"
+
+/** Whether other devices can reach Minori's ports: always before Android 17, which added the permission. */
+private fun localNetworkAllowed(context: Context): Boolean =
+	Build.VERSION.SDK_INT < 37 || context.checkSelfPermission(LOCAL_NETWORK) == PackageManager.PERMISSION_GRANTED

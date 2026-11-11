@@ -20,6 +20,15 @@ class FirewallTest {
 	}
 
 	@Test
+	fun anAllowListDoesNotShutOutThePhoneItself() {
+		val rule = forward(allow = listOf("192.168.1.20"))
+		assertTrue(Firewall.allows(rule, address("127.0.0.1")))
+		assertTrue(Firewall.allows(rule, address("::1")))
+		assertTrue(Firewall.allows(rule, address("192.168.1.20")))
+		assertFalse(Firewall.allows(rule, address("192.168.1.21")))
+	}
+
+	@Test
 	fun allowListLetsOnlyItsRangesIn() {
 		val rule = forward(allow = listOf("192.168.1.0/24"))
 		assertTrue(Firewall.allows(rule, address("192.168.1.20")))

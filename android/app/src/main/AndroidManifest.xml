@@ -11,6 +11,8 @@
 		tools:ignore="ProtectedPermissions" />
 	<!-- Downloading catalog images, and published ports that other devices may reach. -->
 	<uses-permission android:name="android.permission.INTERNET" />
+	<!-- Android 17 lets other devices on the network reach an app only with this, for ports published to the network. -->
+	<uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
 	<!-- Keeps the process, and so its VMs, alive while machines run. -->
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
