@@ -2,6 +2,7 @@ package com.wonderhoylabs.minori.service
 
 import android.content.Context
 import android.content.Intent
+import com.jcraft.jsch.JSchException
 import com.wonderhoylabs.airi.client.Airi
 import com.wonderhoylabs.minori.MinoriApp
 import com.wonderhoylabs.minori.backend.RunningGuest
@@ -27,6 +28,8 @@ object AiriSetup {
 	private const val LEGACY_LABEL = "Airi"
 	private const val LOOP_ASSET = "minori-airi.sh"
 	private const val SSH_TIMEOUT_MS = 5 * 60 * 1000L
+	private const val LOGIN_RETRY_MS = 2 * 60 * 1000L
+	private const val LOGIN_RETRY_POLL_MS = 2000L
 	private const val POLL_MS = 1000L
 	private val TOKEN = Regex("\\b[0-9a-fA-F]{64}\\b")
 
@@ -144,7 +147,7 @@ object AiriSetup {
 		val termux = vm.backend == BackendKind.TERMUX
 		val key = File(dir, "ssh/id_rsa").takeIf { it.exists() && !termux }?.readText()
 
-		fun run(command: String, stdin: ByteArray? = null): Ssh.Result = Ssh.run(
+		fun runOnce(command: String, stdin: ByteArray?): Ssh.Result = Ssh.run(
 			// The same name and user as Minori's own console for each kind of machine, so the host key it saw matches.
 			hostAlias = if (termux) "termux-${vm.id}" else "vm-${vm.id}.minori",
 			user = if (termux) "root" else vm.access.user,
@@ -157,6 +160,24 @@ object AiriSetup {
 			command = command,
 			stdin = stdin,
 		)
+
+		// Just after boot the guest's agent can answer once and then drop out for a moment while the machine settles,
+		// so a login that fails before any command runs is tried again for a while, not shown as a stack of errors.
+		fun run(command: String, stdin: ByteArray? = null): Ssh.Result {
+			val deadline = System.currentTimeMillis() + LOGIN_RETRY_MS
+			while (true) {
+				try {
+					return runOnce(command, stdin)
+				} catch (error: JSchException) {
+					val beforeLogin = error.message.orEmpty().startsWith("Session.connect")
+					if (!beforeLogin || System.currentTimeMillis() > deadline) {
+						throw IOException("Minori couldn't log in to ${vm.name} over SSH. Try again in a minute.", error)
+					}
+					job.step = "Waiting for ${vm.name}'s SSH server"
+					Thread.sleep(LOGIN_RETRY_POLL_MS)
+				}
+			}
+		}
 		val output =
 			if (termux) {
 				installInTermux(context, vm, agent, token, job, ::run)
