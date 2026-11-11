@@ -539,7 +539,7 @@ dependencies = [
 
 [[package]]
 name = "minori"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "minori-core",
  "serde_json",
@@ -547,14 +547,14 @@ dependencies = [
 
 [[package]]
 name = "minori-agent"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "libc",
 ]
 
 [[package]]
 name = "minori-core"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "ext4-view",
  "fatfs",
@@ -569,7 +569,7 @@ dependencies = [
 
 [[package]]
 name = "minori-jni"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "bytes",
  "jni",
