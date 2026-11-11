@@ -26,7 +26,7 @@ object AiriSetup {
 	const val PORT = 47821
 	private const val LEGACY_LABEL = "Airi"
 	private const val LOOP_ASSET = "minori-airi.sh"
-	private const val SSH_TIMEOUT_MS = 2 * 60 * 1000L
+	private const val SSH_TIMEOUT_MS = 5 * 60 * 1000L
 	private const val POLL_MS = 1000L
 	private val TOKEN = Regex("\\b[0-9a-fA-F]{64}\\b")
 
@@ -107,7 +107,11 @@ object AiriSetup {
 
 				VmState.Running -> {
 					val guest = app.machines.guest(vm.id)
-					if (guest != null && guest.listeningPorts()?.contains(vm.access.sshPort) != false) return guest
+					// A VM counts as running as soon as it boots, before its guest agent answers, and SSH goes through
+					// that agent, so wait for it to list SSH's port. A Termux machine has no agent, and runs once SSH does.
+					val ports = guest?.let { runCatching { it.listeningPorts() }.getOrElse { emptyList() } }
+					val ready = if (vm.backend == BackendKind.TERMUX) guest != null else ports?.contains(vm.access.sshPort) == true
+					if (ready) return guest!!
 					if (deadline == Long.MAX_VALUE) deadline = System.currentTimeMillis() + SSH_TIMEOUT_MS
 					job.step = "Waiting for ${vm.name}'s SSH server"
 				}
