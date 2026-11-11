@@ -200,6 +200,8 @@ debug build's demo backend pointed at real guests: Debian 13 in QEMU, and Debian
 | Helper and library: wake without opening Minori, list, start, ports, desktop, VNC login, wrong password refused | Emulator, Node 24 on the Mac       | Pass   |
 | Asahi with Minori as a source: a machine's desktop with keyboard and mouse, its console, back to the Pixel | Emulator, Asahi's dev server       | Pass   |
 | AVF: Debian 13 boots, console login, the agent comes up from cloud-init, SSH over vsock           | Pixel 10 Pro                                | Pass   |
+| **KDE Plasma from the store on AVF**: download, first boot, internet through Minori (apt fetched about 1,400 packages over HTTPS), desktop ready in about 14 minutes | Pixel 10 Pro, on Wi-Fi | Pass |
+| That machine's desktop over VNC, and Remote Desktop with FreeRDP, both through Minori's helper and agent | Pixel 10 Pro, from the Mac over adb | Plasma's desktop with the right date and time |
 
 **Never run:**
 
