@@ -233,9 +233,17 @@ debug build's demo backend pointed at real guests: Debian 13 in QEMU, and Debian
 | Minori's own desktop viewer on that machine: picture, taps, KDE's menu, sideways                  | Pixel 10 Pro                                | Pass after a fix; 0.1.0's viewer closed at once with "Operation not supported on transport endpoint" |
 | **Xfce from the store**, 0.2.0's release build: download, first boot, internet through Minori, Xfce in Minori's viewer | Pixel 10 Pro, on Wi-Fi | Pass; setup finished in about 5 minutes |
 | Asahi with Minori as a source: the Xfce machine's desktop with a mouse, and its console | Pixel 10 Pro, Asahi's dev server in Chrome | Pass |
+| **Android's terminal through Minori**, 0.3.0 built locally with the release key: Set up, the install command in the terminal, Android's port 5741 allowed, the switch on | Pixel 10 Pro, the terminal's Debian | The agent answered only with the token; `minori0` became the default route |
+| The terminal with Wi-Fi and mobile data off, Shira as the VPN (from Asahi's dev server on the Mac) | Same | `curl https://deb.debian.org` 200, 10 MB at 1.7 MB/s, public IP the Mac's network. With the switch off: "Could not resolve host" |
+| The terminal with Wi-Fi and mobile data off, Akiyama as the VPN (`akiyama server --adb` on the Mac) | Same | 200, 10 MB at 2.0 MB/s, the Mac's public IP. With the switch off: no DNS, no connection |
+| The Xfce machine with Wi-Fi and mobile data off, Akiyama as the VPN, `curl` over Minori's SSH | Pixel 10 Pro | The Mac's public IP, deb.debian.org 200, 10 MB at 223 KB/s |
 | Termux with Google Play's Termux (`googleplay.2026.10.09`) installed: Settings explains it and links to F-Droid | Pixel 10 Pro | Pass; 0.2.0's **Allow Minori to use Termux** did nothing |
 
 **Never run:**
+
+- Saki as the phone's VPN for Minori's machines or the terminal; and the Xfce machine through Shira with Wi-Fi off
+  (Shira's page went away before that run).
+- IPv6 through the terminal's link: the agent only routes IPv4, and the terminal had no IPv6 route to leak through.
 
 - Ubuntu and Fedora from the store, and the Termux backend's other distributions.
 - GNOME and the app items on a phone.
