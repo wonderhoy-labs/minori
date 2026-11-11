@@ -30,6 +30,17 @@ object AiriSetup {
 	private const val SSH_TIMEOUT_MS = 5 * 60 * 1000L
 	private const val LOGIN_RETRY_MS = 2 * 60 * 1000L
 	private const val LOGIN_RETRY_POLL_MS = 2000L
+
+	/** Installs Xwayland if it's missing, with the package manager the machine has. Its user can sudo without a password. */
+	private const val XWAYLAND =
+		"command -v Xwayland >/dev/null && exit 0; " +
+			"if command -v apt-get >/dev/null; then " +
+			"sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y -q xwayland || " +
+			"{ sudo -n apt-get update -q && sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y -q xwayland; }; " +
+			"elif command -v dnf >/dev/null; then sudo -n dnf install -y -q xorg-x11-server-Xwayland; " +
+			"else echo \"no apt-get or dnf to install Xwayland with\"; exit 1; fi; " +
+			// The agent looks for Xwayland when it starts.
+			"command -v Xwayland >/dev/null && systemctl --user restart airi-agent"
 	private const val POLL_MS = 1000L
 	private val TOKEN = Regex("\\b[0-9a-fA-F]{64}\\b")
 
@@ -188,7 +199,12 @@ object AiriSetup {
 				check(run("mkdir -p $folder && cat > $folder/airi-agent", agent), "copy Airi's agent")
 				check(run("cat > $folder/install.sh", installer), "copy Airi's installer")
 				job.step = "Running Airi's installer"
-				run("sh $folder/install.sh $token").also { check(it, "install Airi's agent") }.output
+				val installed = run("sh $folder/install.sh $token").also { check(it, "install Airi's agent") }.output
+				// Android's terminal comes with Xwayland, which Airi needs for X11 apps; a cloud image doesn't. Without
+				// it Airi still works for Wayland apps, so a failure here is only noted.
+				job.step = "Adding Xwayland for X11 apps"
+				val xwayland = run(XWAYLAND)
+				if (xwayland.exitCode == 0) installed else "$installed\n\nXwayland: ${xwayland.output.trim().lines().lastOrNull()}"
 			}
 		vms.update(vm.id) { markSetUp(it) }
 		return output.trim()

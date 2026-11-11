@@ -125,7 +125,8 @@ object Catalog {
 		)
 
 	// What every desktop and app runs on: one VNC session, which Remote Desktop shows too.
-	private val DESKTOP_SERVERS = listOf("tigervnc-standalone-server", "xrdp", "dbus-x11")
+	// Xwayland is for Airi, which shows X11 apps through it when the machine is set up for Airi.
+	private val DESKTOP_SERVERS = listOf("tigervnc-standalone-server", "xrdp", "dbus-x11", "xwayland")
 
 	/**
 	 * First boot of a desktop: one session on VNC display :1, which Minori opens itself, and xrdp in front of the same
