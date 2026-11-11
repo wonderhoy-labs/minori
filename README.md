@@ -22,11 +22,17 @@ It's for people who want a real Linux machine in their pocket: to run servers, t
 desktop VM around. Phones without AVF can keep Linux userlands through Termux instead, clearly labelled as not
 being VMs.
 
-<p align="center"><img src="docs/screenshots/machine.png" alt="A machine's page in Minori, on the Android emulator" width="320"></p>
+<p align="center">
+  <img src="docs/screenshots/machines.png" alt="Minori's machine list with a KDE Plasma machine running" width="200">
+  <img src="docs/screenshots/store.png" alt="Minori's store, with Debian 13 featured above Ubuntu and Fedora" width="200">
+  <img src="docs/screenshots/store-item.png" alt="The KDE Plasma item in the store" width="200">
+  <img src="docs/screenshots/machine.png" alt="A running machine's page: console, SSH, desktop, internet and login" width="200">
+</p>
+<p align="center"><img src="docs/screenshots/desktop.png" alt="KDE Plasma's desktop and menu in Minori's own viewer, turned sideways" width="640"></p>
+<p align="center"><sub>All on a Pixel 10 Pro, with Debian 13 and KDE Plasma running under AVF.</sub></p>
 
-This is early software, and its main part has **not run on a phone yet**: no device with AVF was available while it
-was written, so every VM shown here ran on the emulator's demo backend. [What has been tested](#what-has-been-tested)
-says exactly what ran.
+This is early software. It has run on one phone, a Pixel 10 Pro; Ubuntu, Fedora and much of the rest have only run
+on the emulator against real guests. [What has been tested](#what-has-been-tested) says exactly what ran.
 
 ## What you need
 
@@ -45,7 +51,7 @@ Download the APK from [Releases](https://github.com/wonderhoy-labs/minori/releas
 install it with `adb`:
 
 ```bash
-adb install -r minori-v0.1.0.apk
+adb install -r minori-v0.1.1.apk
 ```
 
 Then open Minori; its setup screen grants the two permissions virtual machines need, with Shizuku or a command for
@@ -133,7 +139,7 @@ sparse raw disk, extract a bootable kernel and initrd, write cloud-init seeds, a
 archives. Add it by the release tag:
 
 ```toml
-minori-core = { git = "https://github.com/wonderhoy-labs/minori", tag = "v0.1.0" }
+minori-core = { git = "https://github.com/wonderhoy-labs/minori", tag = "v0.1.1" }
 ```
 
 ```rust
@@ -155,7 +161,7 @@ machines, start and stop them, read their ports, and open a guest port, the cons
 draws a machine's desktop on a canvas, with mouse and keyboard. It has no dependencies; add it by the release's URL:
 
 ```json
-"@wonderhoy-labs/minori": "https://github.com/wonderhoy-labs/minori/releases/download/v0.1.0/wonderhoy-labs-minori-0.1.0.tgz"
+"@wonderhoy-labs/minori": "https://github.com/wonderhoy-labs/minori/releases/download/v0.1.1/wonderhoy-labs-minori-0.1.1.tgz"
 ```
 
 ```ts
@@ -206,6 +212,7 @@ debug build's demo backend pointed at real guests: Debian 13 in QEMU, and Debian
 | AVF: Debian 13 boots, console login, the agent comes up from cloud-init, SSH over vsock           | Pixel 10 Pro                                | Pass   |
 | **KDE Plasma from the store on AVF**: download, first boot, internet through Minori (apt fetched about 1,400 packages over HTTPS), desktop ready in about 14 minutes | Pixel 10 Pro, on Wi-Fi | Pass |
 | That machine's desktop over VNC, and Remote Desktop with FreeRDP, both through Minori's helper and agent | Pixel 10 Pro, from the Mac over adb | Plasma's desktop with the right date and time |
+| Minori's own desktop viewer on that machine: picture, taps, KDE's menu, sideways                  | Pixel 10 Pro                                | Pass after a fix; 0.1.0's viewer closed at once with "Operation not supported on transport endpoint" |
 
 **Never run:**
 
