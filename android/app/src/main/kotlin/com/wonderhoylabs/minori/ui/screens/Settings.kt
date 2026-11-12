@@ -52,6 +52,7 @@ import com.wonderhoylabs.minori.setup.Privileges
 import com.wonderhoylabs.minori.store.freeBytes
 import com.wonderhoylabs.minori.ui.AppModel
 import com.wonderhoylabs.minori.ui.Brand
+import com.wonderhoylabs.minori.ui.ChildProcessNotice
 import com.wonderhoylabs.minori.ui.InfoRow
 import com.wonderhoylabs.minori.ui.Panel
 import com.wonderhoylabs.minori.ui.Screen
@@ -75,9 +76,7 @@ fun SettingsTab(model: AppModel) {
 	val termuxInstalled =
 		remember(refresh) { runCatching { context.packageManager.getPackageInfo(TermuxHypervisor.TERMUX, 0) }.isSuccess }
 	val termuxOffersCommands = remember(refresh) { TermuxHypervisor.offersRunCommand(context) }
-	val notificationsAllowed =
-		Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-			context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+	val notificationsAllowed = remember(refresh) { com.wonderhoylabs.minori.ui.notificationsAllowed(context) }
 
 	Column(
 		Modifier.fillMaxSize().verticalScroll(
@@ -122,6 +121,7 @@ fun SettingsTab(model: AppModel) {
 			} else if (termux == Availability.Ready) {
 				OutlinedButton(onClick = { checkTermux(model, app) }) { Text("Check Termux") }
 			}
+			if (termux == Availability.Ready) ChildProcessNotice("a few Termux machines, or one with a desktop,")
 		}
 		TerminalPanel(model)
 		Panel(title = "Notifications") {
@@ -165,10 +165,6 @@ fun SettingsTab(model: AppModel) {
 					)
 				}
 			}
-			Text(
-				"A Wonderhoy Labs project, named for ${Brand.CHARACTER} of ${Brand.UNIT}",
-				style = MaterialTheme.typography.bodyMedium,
-			)
 			OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(Brand.REPOSITORY))) }) {
 				Icon(Icons.Rounded.Code, contentDescription = null, modifier = Modifier.size(18.dp))
 				Text("  Source code")

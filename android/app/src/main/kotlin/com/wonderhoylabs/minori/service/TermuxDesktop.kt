@@ -17,22 +17,26 @@ import java.io.IOException
  * phone's loopback.
  */
 object TermuxDesktop {
-	private const val LOOP_ASSET = "minori-desktop.sh"
+	/** The loop in Minori's assets. */
+	const val LOOP_ASSET = "minori-desktop.sh"
 	private const val DIR = "/root/.config/minori-desktop"
 
 	/** Where Minori puts the loop that keeps the desktop running. */
 	const val LOOP = "/root/.local/bin/minori-desktop"
 
-	/** The distributions Minori knows how to put Xfce, TigerVNC and xrdp on. */
+	/**
+	 * The distributions Minori knows how to put Xfce, TigerVNC and xrdp on, with the package holding the wallpaper
+	 * their Xfce looks for, without which the desktop is black.
+	 */
 	private val PACKAGES =
 		mapOf(
-			"debian" to APT,
-			"ubuntu" to APT,
+			"debian" to "$APT desktop-base",
+			"ubuntu" to "$APT xubuntu-wallpapers",
 		)
 
 	private const val APT =
 		"apt-get update -q && DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends " +
-			"xfce4 xfce4-terminal dbus-x11 tigervnc-standalone-server tigervnc-tools xrdp ssl-cert"
+			"xfce4 xfce4-terminal dbus-x11 tigervnc-standalone-server tigervnc-tools xrdp ssl-cert tzdata"
 
 	/** Whether Minori can add a desktop to [vm]. */
 	fun canSetUp(vm: VmConfig): Boolean = vm.backend == BackendKind.TERMUX && vm.distro in PACKAGES

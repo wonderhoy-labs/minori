@@ -3,7 +3,9 @@ package com.wonderhoylabs.minori.ui.screens
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -88,6 +90,7 @@ import com.wonderhoylabs.minori.service.gib
 import com.wonderhoylabs.minori.store.usage
 import com.wonderhoylabs.minori.ui.ActionTile
 import com.wonderhoylabs.minori.ui.AppModel
+import com.wonderhoylabs.minori.ui.ChildProcessNotice
 import com.wonderhoylabs.minori.ui.ConfirmDialog
 import com.wonderhoylabs.minori.ui.InfoRow
 import com.wonderhoylabs.minori.ui.MachineTile
@@ -97,6 +100,7 @@ import com.wonderhoylabs.minori.ui.StatusPill
 import com.wonderhoylabs.minori.ui.SubScreen
 import com.wonderhoylabs.minori.ui.backendLabel
 import com.wonderhoylabs.minori.ui.copy
+import com.wonderhoylabs.minori.ui.rememberStartAsking
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -172,7 +176,8 @@ fun DetailScreen(model: AppModel, vmId: String) {
 			}
 		}
 	}) {
-		Hero(vm, state, onStart = { app.machines.start(vm.id) }, onStop = { app.machines.stop(vm.id) }, onForce = {
+		val start = rememberStartAsking { app.machines.start(it) }
+		Hero(vm, state, onStart = { start(vm.id) }, onStop = { app.machines.stop(vm.id) }, onForce = {
 			confirmForce =
 				true
 		})
@@ -285,22 +290,44 @@ fun DetailScreen(model: AppModel, vmId: String) {
 	}
 	if (confirmDelete) {
 		var keepDisks by remember { mutableStateOf(false) }
+		// A Termux machine lives in its distribution's installation in Termux, which other machines may share.
+		val distro =
+			TermuxHypervisor.DISTROS.firstOrNull { it.id == vm.distro }?.takeIf { distro ->
+				vm.backend == BackendKind.TERMUX &&
+					vms.none { it.id != vm.id && it.backend == BackendKind.TERMUX && it.distro == distro.id }
+			}
+		var removeDistro by remember { mutableStateOf(true) }
 		ConfirmDialog(
 			title = "Delete ${vm.name}?",
 			text =
-				if (keepDisks) {
-					"Its settings go, and its disks move to Images."
-				} else {
-					"Its settings and disks are deleted. This can't be undone."
+				when {
+					keepDisks -> "Its settings go, and its disks move to Images."
+
+					distro != null && removeDistro ->
+						"Its settings go, and Termux deletes its ${distro.name}, with everything in it. This can't be undone."
+
+					distro != null -> "Its settings go. Its ${distro.name} stays in Termux, for proot-distro or a new machine."
+
+					else -> "Its settings and disks are deleted. This can't be undone."
 				},
 			confirm = "Delete",
 			onConfirm = {
 				app.machines.forceStop(vm.id)
 				app.vms.delete(vm.id, keepDisks, app.images)
+				if (distro != null && removeDistro) TermuxHypervisor(context).removeDistro(distro)
 				model.back()
 			},
 			onDismiss = { confirmDelete = false },
 			extra = {
+				if (distro != null) {
+					Row(
+						verticalAlignment = Alignment.CenterVertically,
+						modifier = Modifier.toggleable(removeDistro, role = Role.Checkbox) { removeDistro = it },
+					) {
+						Checkbox(checked = removeDistro, onCheckedChange = null)
+						Text("  Remove ${distro.name} from Termux")
+					}
+				}
 				if (vm.backend != BackendKind.TERMUX) {
 					Row(
 						verticalAlignment = Alignment.CenterVertically,
@@ -312,6 +339,13 @@ fun DetailScreen(model: AppModel, vmId: String) {
 				}
 			},
 		)
+	}
+	val localNetwork = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+		app.machines.refreshForwards(vm.id)
+		if (!granted) {
+			model.message.value =
+				"Without access to your local network, Android keeps other devices out. Allow it in Minori's permissions."
+		}
 	}
 	editPort?.let { forward ->
 		PortDialog(
@@ -325,6 +359,9 @@ fun DetailScreen(model: AppModel, vmId: String) {
 				}
 				app.machines.refreshForwards(vm.id)
 				editPort = null
+				if (saved.exposure == Exposure.NETWORK && !localNetworkAllowed(context)) {
+					localNetwork.launch(LOCAL_NETWORK)
+				}
 			},
 			onDelete = {
 				app.vms.update(vm.id) { current ->
@@ -491,7 +528,8 @@ private fun LoginPanel(model: AppModel, vm: VmConfig, running: Boolean, desktop:
 
 @Composable
 private fun PortsPanel(vm: VmConfig, running: Boolean, listening: List<Int>?, onEdit: (PortForward) -> Unit) {
-	val app = MinoriApp.get(LocalContext.current)
+	val context = LocalContext.current
+	val app = MinoriApp.get(context)
 	val forwards by app.machines.forwarder.status.collectAsState()
 	Panel(title = "Ports", action = {
 		IconButton(onClick = { onEdit(PortForward(hostPort = 2222, guestPort = 22, label = "SSH")) }) {
@@ -517,8 +555,14 @@ private fun PortsPanel(vm: VmConfig, running: Boolean, listening: List<Int>?, on
 			Text(
 				when {
 					!forward.enabled -> "Off"
+
+					forward.exposure == Exposure.NETWORK && !localNetworkAllowed(context) ->
+						"Only this phone can connect: Minori needs access to your local network, which Android asks for when you save the port"
+
 					status == null -> if (running) "Not listening" else "Listens while the machine runs"
+
 					status.error != null -> status.error
+
 					else -> "${status.open} open · ${status.served} served · ${status.refused} refused"
 				},
 				style = MaterialTheme.typography.labelMedium,
@@ -682,6 +726,7 @@ private fun TermuxDesktopPanel(model: AppModel, vm: VmConfig, running: Boolean) 
 			style = MaterialTheme.typography.bodySmall,
 			color = MaterialTheme.colorScheme.onSurfaceVariant,
 		)
+		ChildProcessNotice("a desktop")
 		FilledTonalButton(enabled = running, onClick = {
 			model.run("Adding a desktop to ${vm.name}", { job -> TermuxDesktop.install(context, app.vms, vm, job) }) {
 				model.message.value = "${vm.name} has a desktop now. Open it with Desktop."
@@ -689,3 +734,10 @@ private fun TermuxDesktopPanel(model: AppModel, vm: VmConfig, running: Boolean) 
 		}) { Text(if (running) "Add a desktop" else "Start it to add a desktop") }
 	}
 }
+
+/** Android 17's permission for traffic with other devices on the local network, which ports on the network need. */
+private const val LOCAL_NETWORK = "android.permission.ACCESS_LOCAL_NETWORK"
+
+/** Whether other devices can reach Minori's ports: always before Android 17, which added the permission. */
+private fun localNetworkAllowed(context: Context): Boolean =
+	Build.VERSION.SDK_INT < 37 || context.checkSelfPermission(LOCAL_NETWORK) == PackageManager.PERMISSION_GRANTED

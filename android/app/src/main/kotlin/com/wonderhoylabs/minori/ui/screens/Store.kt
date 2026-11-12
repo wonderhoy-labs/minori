@@ -48,6 +48,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -88,8 +89,9 @@ private fun Template.matches(query: String): Boolean {
 		features.any { q in it.lowercase() }
 }
 
-fun downloadLabel(template: Template): String {
-	val mb = template.baseImage.sizeMb + template.extraDownloadMb
+/** Roughly how much making [template] downloads, leaving out its base image when that's already on the phone. */
+fun downloadLabel(template: Template, haveImage: Boolean = false): String {
+	val mb = (if (haveImage) 0 else template.baseImage.sizeMb) + template.extraDownloadMb
 	return if (mb >= 1000) "%.1f GB".format(mb / 1000.0) else "$mb MB"
 }
 
@@ -177,7 +179,9 @@ fun StoreTab(model: AppModel) {
 			item { Featured(Catalog.templates.first()) { model.go(Screen.StoreItem(it.id)) } }
 		}
 		items(templates.drop(if (shelf == Shelf.All && query.isBlank()) 1 else 0), key = { it.id }) { template ->
-			StoreRow(template) { model.go(Screen.StoreItem(template.id)) }
+			StoreRow(template, Catalog.downloaded(template.baseImage, app.images) != null) {
+				model.go(Screen.StoreItem(template.id))
+			}
 		}
 		if (showTermux) {
 			item {
@@ -236,7 +240,7 @@ private fun Featured(template: Template, onOpen: (Template) -> Unit) {
 	) {
 		Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
 			Text(
-				"FEATURED",
+				"Featured",
 				style = MaterialTheme.typography.labelMedium,
 				color = scheme.onPrimaryContainer,
 				fontWeight = FontWeight.Bold,
@@ -260,11 +264,11 @@ private fun Featured(template: Template, onOpen: (Template) -> Unit) {
 }
 
 @Composable
-private fun StoreRow(template: Template, onOpen: () -> Unit) {
+private fun StoreRow(template: Template, haveImage: Boolean, onOpen: () -> Unit) {
 	ListCard(
 		tile = { StoreIconTile(template.icon) },
 		title = template.name,
-		subtitle = "${template.category.label.removeSuffix("s")} · ${downloadLabel(template)}",
+		subtitle = "${template.category.label.removeSuffix("s")} · ${downloadLabel(template, haveImage)}",
 		text = template.summary,
 		button = "Get",
 		onClick = onOpen,
@@ -369,6 +373,8 @@ fun verdictText(image: ImageRecord): String {
 fun StoreItemScreen(model: AppModel, templateId: String) {
 	val template = Catalog.template(templateId) ?: return
 	val scheme = MaterialTheme.colorScheme
+	val app = MinoriApp.get(LocalContext.current)
+	val haveImage = remember(template) { Catalog.downloaded(template.baseImage, app.images) != null }
 	SubScreen(title = "", model = model) {
 		Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)) {
 			StoreIconTile(template.icon, size = 96.dp)
@@ -376,7 +382,7 @@ fun StoreItemScreen(model: AppModel, templateId: String) {
 				Text(template.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
 				Text(template.publisher, style = MaterialTheme.typography.bodyMedium, color = scheme.primary)
 				Text(
-					"${template.category.label.removeSuffix("s")} · ${downloadLabel(template)}",
+					"${template.category.label.removeSuffix("s")} · ${downloadLabel(template, haveImage)}",
 					style = MaterialTheme.typography.labelMedium,
 					color = scheme.onSurfaceVariant,
 				)
@@ -421,7 +427,15 @@ fun StoreItemScreen(model: AppModel, templateId: String) {
 		Panel(title = "Needs") {
 			InfoRow(Icons.Rounded.Memory, "Memory", "${memoryLabel(template.memoryMib)} suggested")
 			InfoRow(Icons.Rounded.Storage, "Storage", "${template.diskGib} GB disk, which only takes what it uses")
-			InfoRow(Icons.Rounded.CloudDownload, "Download", downloadLabel(template))
+			InfoRow(
+				Icons.Rounded.CloudDownload,
+				"Download",
+				if (haveImage && template.extraDownloadMb == 0) {
+					"Nothing, its image is already on this phone"
+				} else {
+					downloadLabel(template, haveImage) + if (haveImage) ", its image is already on this phone" else ""
+				},
+			)
 			InfoRow(Icons.Rounded.Schedule, "First boot", template.firstBoot.replaceFirstChar { it.uppercase() })
 		}
 		Panel(title = "Source") {

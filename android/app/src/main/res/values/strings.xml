@@ -12,6 +12,7 @@
 		<item quantity="one">%d machine running</item>
 		<item quantity="other">%d machines running</item>
 	</plurals>
+	<string name="app_link_low_memory">%1$s needs %2$s, more than the phone has free, so Minori didn\'t start it. Stop another machine, or start it from its page anyway.</string>
 	<string name="app_link_needs_airi">To open %1$s\'s apps, install Airi and set it up in %1$s from its page.</string>
 	<string name="app_link_old_airi">This Airi only knows Android\'s terminal. Update Airi to 0.4.0 or later to open apps from Minori\'s machines.</string>
 	<string name="airi_no_machine">That machine isn\'t in Minori any more.</string>

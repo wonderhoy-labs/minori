@@ -82,7 +82,7 @@ Android closes Minori when the second one is granted. Open it again and it check
 
 Tap **New machine** and pick a source:
 
-- **Catalog:** Debian 13, Ubuntu 24.04 LTS or Fedora 43, downloaded from the project's own servers and checked
+- **Catalog:** Debian 13, Ubuntu 26.04 or 24.04 LTS or Fedora 43, downloaded from the project's own servers and checked
   against its published checksums. Or a desktop (KDE Plasma, Xfce or GNOME) or one app (Chromium, Firefox,
   LibreOffice, GIMP, Inkscape, Krita, Thunderbird, VLC or Blender), each built from Debian 13 on first boot.
 - **Your images:** a raw disk, `.img`, qcow2 or ISO you imported. Minori looks inside first and tells you what it is,
@@ -116,10 +116,12 @@ the page shows each port's state and how many connections it served or refused.
 
 - **Images** lists what you imported, with its format, size, SHA-256, CPU and what Minori found inside.
 - **Edit** a stopped machine to change its CPUs and memory, grow a disk, add an empty disk or attach an image,
-  choose which disk it boots from, and change the kernel command line.
+  choose which disk it boots from, and change the kernel command line. A Termux machine has only its name, login and
+  notes to change.
 - **Export** writes a `.minorivm` archive anywhere the system's file picker can save; **Import a .minorivm archive** on
   the main screen brings one back. The format is in [docs/archive.md](docs/archive.md).
-- **Clone** copies a machine, disks and all. **Delete** asks whether to keep its disks in Images.
+- **Clone** copies a machine, disks and all. **Delete** asks whether to keep its disks in Images. Deleting the last
+  Termux machine of a distribution offers to remove that distribution from Termux too.
 
 ### Without a hypervisor: Termux
 
@@ -136,7 +138,8 @@ Airi can show a Termux machine's apps too, apart from Alpine's, whose musl Airi'
 A Debian or Ubuntu Termux machine can have a **desktop**: **Add a desktop** on its page installs Xfce, TigerVNC and
 xrdp, about 500 MB. It's one session that Minori's **Desktop** and Asahi show over VNC, and that Remote Desktop apps on
 the phone reach with **RDP app**, logging in with the first 8 characters of the machine's password. Both listen on
-the phone's loopback only, on ports of the machine's own, and start and stop with the machine.
+the phone's loopback only, on ports of the machine's own, and start and stop with the machine. A desktop needs
+**Disable child process restrictions** on in Developer options, or Android stops it.
 
 ### Android's own terminal through your VPN
 
@@ -222,8 +225,8 @@ debug build's demo backend pointed at real guests: Debian 13 in QEMU, and Debian
 
 | What                                                                                              | Where                                       | Result |
 | ------------------------------------------------------------------------------------------------- | ------------------------------------------- | ------ |
-| `cargo test --workspace` (16 tests), Clippy, rustfmt                                              | Mac                                         | Pass   |
-| `:app:testDebugUnitTest` (31 tests), Spotless, `:app:lintRelease`                                 | Mac                                         | Pass   |
+| `cargo test --workspace` (19 tests), Clippy, rustfmt                                              | Mac                                         | Pass   |
+| `:app:testDebugUnitTest` (38 tests), Spotless, `:app:lintRelease`                                 | Mac                                         | Pass   |
 | `@wonderhoy-labs/minori` (13 tests: DES vectors, the helper protocol, a VNC session against a fake server) | Mac                              | Pass   |
 | Inspect Debian 13's official arm64 cloud image (qcow2); qcow2 to raw                              | Mac and the emulator                        | Found GPT, ext4, kernel and initrd; byte-identical to `qemu-img` |
 | Kernel, initrd and seed Minori made, booted                                                       | QEMU 10 `virt`, TCG, in Docker              | Debian 13 booted, cloud-init applied the seed, SSH logged in |
@@ -260,6 +263,21 @@ debug build's demo backend pointed at real guests: Debian 13 in QEMU, and Debian
 | Asahi's console for that machine at the tab's size, and after the tab shrank | Pixel 10 Pro, 0.5.0 and Asahi 0.4.2 through its development server | Pass; before 0.5.0 it kept the 52 columns of Minori's own console |
 | **Desktop in a Termux machine**: Add a desktop, Xfce in Minori's viewer, FreeRDP logging in to the same session over RDP | Pixel 10 Pro, 0.6.0; FreeRDP 3 in a Debian 13 container on the Mac through `adb forward` | Pass |
 | Arch Linux in Termux | Pixel 10 Pro, 0.6.0 | Refused by proot-distro: no arm64 image. 0.6.1 marked it unavailable |
+| **End-to-end run for 0.7.0**, built with the release key: a Debian 13 machine from a downloaded image (online 15 s after Start), console, in-app SSH with the host key prompt, SSH from the Mac through a published port, allow and deny lists over Wi-Fi | Pixel 10 Pro, Android 17 | Pass after three fixes: finished connections stayed open, an edited port could stop listening, and ports on the network needed Android 17's local network permission |
+| Edit: name, memory, one CPU, start at boot, growing the disk from 8 to 10 GB and adding a 1 GB disk, all seen inside; shut down, force stop, clone, export (409 MB in 20 s), import, delete keeping the disks | Same | Pass |
+| ISOs: an x86-64 one refused with the reason; Alpine's aarch64 virt ISO booted from its own kernel | Same | Pass |
+| Store: Ubuntu 24.04, **Ubuntu 26.04**, Fedora 43 and GNOME made, booted, online, SSH and HTTPS; GNOME over RDP with FreeRDP | Same | Pass; Ubuntu 26.04 after a fix, since its kernel is wrapped in a systemd-stub program |
+| Fedora 45 | Same | No kernel found: it's only in the Btrfs root. The store stays on Fedora 43 |
+| **Termux**: Ubuntu, Alpine, Fedora and Arch Linux ARM machines started at once, each online, consoles through the helper | Pixel 10 Pro, F-Droid Termux 0.118.3 | Pass |
+| A desktop in the Ubuntu 26.04 Termux machine: install (about 4 minutes), Xfce in Minori's viewer, FreeRDP to the same session | Same | Pass after fixes: the backdrop was black, and with four Termux machines running, Android's limit of 32 child processes killed the desktop and three SSH servers |
+| Airi in the GNOME machine: Set up in Minori (8 s), GNOME's apps listed, Text Editor in an Airi window with typing; `minori://vm/GNOME/app/org.gnome.TextEditor.desktop` starting the stopped machine and opening it (about 40 s) | Pixel 10 Pro, Airi 0.4.1 | Pass |
+| **Firefox from the store**: made from the downloaded image in seconds, first boot in about 3 minutes, Firefox in Minori's viewer loading example.com | Same | Pass after a fix: the viewer's taps and keys never reached a Termux machine's desktop, since they were written on the main thread |
+| RDP app with Microsoft's Windows App on the Firefox machine | Same | The app opened on 127.0.0.1 and showed the machine's certificate; not signed in, since accepting the certificate was left to the owner |
+| GNOME (4 GB) and Firefox (3 GB) running at once | Same | Android swapped until Minori stopped responding. Since 0.7.0 Minori asks before starting a machine that needs more memory than is free |
+| Deleting Termux machines with **Remove … from Termux**: Termux ran `proot-distro remove` for Ubuntu, Alpine, Fedora and Arch | Pixel 10 Pro | Pass |
+| Android's terminal through Minori, 0.7.0 | Same | Default route `minori0`, `curl https://deb.debian.org/debian/` HTTP/2 200 |
+| The helper as Asahi uses it: hello, list, ports, a stream to the Firefox machine's SSH, its desktop | Pixel 10 Pro, `tools/minori-client.ts` on the Mac | Pass. Asahi itself wasn't run again: its setup would have replaced the phone's VPN |
+| Minori noticing a Termux machine whose SSH server was killed; Edit for a Termux machine; the notifications prompt on the first start; Discard on Edit's back | Emulator (`Minori_Test_API_37`), F-Droid Termux 0.118.3 | Pass |
 | **Arch Linux ARM in Termux**, 0.6.2: download, signature check, install, pacman keyring and openssh, console (`Arch Linux ARM`, `aarch64`); first setup in the background without Display over other apps | Emulator (`Airi_Test_API_37`, arm64), F-Droid Termux 0.118.3 | Pass |
 
 **Never run:**
@@ -267,10 +285,10 @@ debug build's demo backend pointed at real guests: Debian 13 in QEMU, and Debian
 - The Xfce machine through Shira with Wi-Fi off: Shira's page went away before that run.
 - IPv6 through the terminal's link: the agent only routes IPv4, and the terminal had no IPv6 route to leak through.
 
-- Ubuntu and Fedora from the store, and the Termux backend's other distributions.
-- GNOME and the app items on a phone.
-- RDP and SSH from apps on the phone itself; only FreeRDP on the Mac through the same forwarded port.
-- Auto-start at boot, growing a disk from Edit.
+- The app items other than Firefox on a phone.
+- Signing in with RDP and SSH apps on the phone itself; FreeRDP on the Mac signed in through the same forwarded port.
+- A Termux desktop with Android's child process limit turned off. With it on, Android kills the desktop.
+- Auto-start at boot, which needs the phone restarted.
 - Refusing a non-adb app on the helper socket. Minori checks the peer's uid, but no other app tried.
 
 ## How it works
@@ -350,16 +368,27 @@ others, use the distribution's ARM64 cloud image.
 **Published ports never connect.** They need Minori's guest agent, which machines made with first-boot setup have. Check
 `systemctl status minori-agent` in the guest.
 
+**A Termux machine stops on its own, or its desktop goes black.** Android stops Termux's processes once there are more
+than 32, which several Termux machines or one desktop go past. Turn on **Disable child process restrictions** in
+Developer options; Settings has a button that opens them.
+
+**Other devices can't reach a port published to the network.** On Android 17 Minori needs the local network permission
+for that, and asks when you publish one. If you refused, allow it in Android's settings for Minori.
+
 **`top` or `vim` doesn't fit the console.** Run `resize-console` after turning the phone; serial consoles can't tell
 the guest the size by themselves.
 
 ## Known issues
 
-- Not run on a phone with AVF at all yet (see above).
-- Without AVF's network, guests have no internet. Guest internet over the agent is on the [roadmap](docs/roadmap.md).
+- Fedora 44 and later keep their kernel only in a Btrfs root, which Minori can't read yet, so the store offers 43.
+- Android stops an app's child processes past 32 until **Disable child process restrictions** is on in Developer
+  options. A few Termux machines, or one with a desktop, go past that; Minori says so where it matters.
+- **Listening in the guest** also lists services that listen on the guest's own loopback only, which a published port
+  can't reach.
 - AVF only offers one virtual CPU or one per core.
 - Resizing the terminal doesn't reflow lines already printed.
 - The VNC viewer only speaks raw and copy-rect updates, fine over Minori's own connection but heavy over a network.
+- Keys sent far faster than anyone types, such as `adb shell input text`, can arrive scrambled in the VNC viewer.
 
 ## Development
 

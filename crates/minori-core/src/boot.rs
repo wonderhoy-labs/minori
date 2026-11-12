@@ -55,10 +55,25 @@ fn write_replacing(path: &Path, data: &[u8]) -> Result<()> {
 	Ok(())
 }
 
-/// Unpacks a gzip or EFI zboot kernel. An uncompressed kernel comes back as it was.
+/// Unpacks a gzip or EFI zboot kernel, or the kernel inside a systemd-stub EFI program. An uncompressed kernel comes
+/// back as it was.
 pub fn decompress_kernel(data: Vec<u8>) -> Result<Vec<u8>> {
+	unwrap_kernel(data, 0)
+}
+
+/// How many wrappers deep a kernel may be, such as Ubuntu 26.04's: gzip, then a stub's `.linux`, then zboot.
+const MAX_WRAPPERS: u32 = 4;
+
+fn unwrap_kernel(data: Vec<u8>, depth: u32) -> Result<Vec<u8>> {
+	if depth >= MAX_WRAPPERS {
+		return Ok(data);
+	}
 	if data.starts_with(&[0x1f, 0x8b]) {
-		return gunzip(&data);
+		return unwrap_kernel(gunzip(&data)?, depth + 1);
+	}
+	// A systemd-stub EFI program, which carries the kernel in its .linux section next to device trees and the like.
+	if let Some(linux) = pe_section(&data, b".linux") {
+		return unwrap_kernel(linux.to_vec(), depth + 1);
 	}
 	// An EFI zboot image: a small PE stub carrying the compressed kernel, described at fixed offsets.
 	if data.len() > 0x40 && &data[..2] == b"MZ" && &data[4..8] == b"zimg" {
@@ -81,6 +96,31 @@ pub fn decompress_kernel(data: Vec<u8>) -> Result<Vec<u8>> {
 		};
 	}
 	Ok(data)
+}
+
+/// The contents of the section called [name] in a PE (EFI) program, if [data] is one and has it.
+fn pe_section<'a>(data: &'a [u8], name: &[u8]) -> Option<&'a [u8]> {
+	let u16_at = |at: usize| data.get(at..at + 2).map(|b| u16::from_le_bytes([b[0], b[1]]) as usize);
+	let u32_at = |at: usize| data.get(at..at + 4).map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize);
+	if !data.starts_with(b"MZ") {
+		return None;
+	}
+	let pe = u32_at(0x3c)?;
+	if data.get(pe..pe + 4)? != b"PE\0\0" {
+		return None;
+	}
+	let sections = u16_at(pe + 6)?;
+	let table = pe + 24 + u16_at(pe + 20)?;
+	(0..sections).find_map(|index| {
+		let entry = table + index * 40;
+		let raw = data.get(entry..entry + 8)?;
+		let length = raw.iter().position(|&byte| byte == 0).unwrap_or(8);
+		if &raw[..length] != name {
+			return None;
+		}
+		let (size, start) = (u32_at(entry + 16)?, u32_at(entry + 20)?);
+		data.get(start..start.checked_add(size)?)
+	})
 }
 
 fn gunzip(data: &[u8]) -> Result<Vec<u8>> {
@@ -152,6 +192,40 @@ mod tests {
 		let packed = encoder.finish().unwrap();
 		assert_eq!(kernel_arch(&packed).unwrap(), Arch::Aarch64);
 		assert_eq!(decompress_kernel(packed).unwrap(), kernel);
+	}
+
+	/// A minimal PE program with one section, the way systemd-stub carries a kernel in `.linux`.
+	fn stub_carrying(name: &[u8], payload: &[u8]) -> Vec<u8> {
+		let pe = 0x40usize;
+		let table = pe + 24;
+		let start = table + 40;
+		let mut stub = vec![0u8; start];
+		stub[..2].copy_from_slice(b"MZ");
+		stub[0x3c..0x40].copy_from_slice(&(pe as u32).to_le_bytes());
+		stub[pe..pe + 4].copy_from_slice(b"PE\0\0");
+		stub[pe + 4..pe + 6].copy_from_slice(&0xaa64u16.to_le_bytes());
+		stub[pe + 6..pe + 8].copy_from_slice(&1u16.to_le_bytes());
+		stub[table..table + name.len()].copy_from_slice(name);
+		stub[table + 16..table + 20].copy_from_slice(&(payload.len() as u32).to_le_bytes());
+		stub[table + 20..table + 24].copy_from_slice(&(start as u32).to_le_bytes());
+		stub.extend_from_slice(payload);
+		stub
+	}
+
+	#[test]
+	fn unpacks_a_gzipped_stub_carrying_the_kernel() {
+		// Ubuntu 26.04: vmlinuz is gzip around a systemd-stub program whose .linux section is the kernel.
+		let kernel = fake_arm64_kernel();
+		let stub = stub_carrying(b".linux", &kernel);
+		let mut encoder = GzEncoder::new(Vec::new(), Compression::fast());
+		encoder.write_all(&stub).unwrap();
+		assert_eq!(decompress_kernel(encoder.finish().unwrap()).unwrap(), kernel);
+	}
+
+	#[test]
+	fn leaves_a_pe_without_a_linux_section_alone() {
+		let stub = stub_carrying(b".text", b"code");
+		assert_eq!(decompress_kernel(stub.clone()).unwrap(), stub);
 	}
 
 	#[test]

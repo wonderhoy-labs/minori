@@ -74,11 +74,13 @@ import com.wonderhoylabs.minori.ui.Screen
 import com.wonderhoylabs.minori.ui.StatusPill
 import com.wonderhoylabs.minori.ui.Tab
 import com.wonderhoylabs.minori.ui.backendLabel
+import com.wonderhoylabs.minori.ui.rememberStartAsking
 
 @Composable
 fun MachinesTab(model: AppModel) {
 	val context = LocalContext.current
 	val app = MinoriApp.get(context)
+	val start = rememberStartAsking { app.machines.start(it) }
 	val vms by app.vms.vms.collectAsState()
 	val states by app.machines.states.collectAsState()
 	val avf = remember(vms.size, states) { app.machines.availability(BackendKind.AVF) }
@@ -163,7 +165,7 @@ fun MachinesTab(model: AppModel) {
 					vm = vm,
 					state = states[vm.id] ?: VmState.Stopped,
 					onOpen = { model.go(Screen.Detail(vm.id)) },
-					onToggle = { running -> if (running) app.machines.stop(vm.id) else app.machines.start(vm.id) },
+					onToggle = { running -> if (running) app.machines.stop(vm.id) else start(vm.id) },
 					onConsole = { model.go(Screen.Console(vm.id)) },
 					onSsh = { model.go(Screen.Ssh(vm.id)) },
 					onDesktop = { model.go(Screen.Vnc(vm.id, vm.access.vncPort)) },

@@ -1,13 +1,19 @@
 package com.wonderhoylabs.minori.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
@@ -26,8 +32,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.wonderhoylabs.minori.MinoriApp
+import com.wonderhoylabs.minori.model.BackendKind
 import com.wonderhoylabs.minori.model.CpuMode
 import com.wonderhoylabs.minori.model.DiskRole
 import com.wonderhoylabs.minori.model.VmDisk
@@ -48,6 +57,9 @@ fun EditScreen(model: AppModel, vmId: String) {
 	val states by app.machines.states.collectAsState()
 	val stopped = (states[vm.id] ?: VmState.Stopped).let { it == VmState.Stopped || it is VmState.Failed }
 	val totalMib = remember { totalMemoryMib(context) }
+	// Termux machines share the phone's kernel and Termux's files, so they have no CPUs, memory or disks of their own,
+	// and Minori looks after their desktop's password itself.
+	val termux = vm.backend == BackendKind.TERMUX
 	var name by remember(vm.id) { mutableStateOf(vm.name) }
 	var cpu by remember(vm.id) { mutableStateOf(vm.cpu) }
 	var memory by remember(vm.id) { mutableStateOf(vm.memoryMib.toString()) }
@@ -62,8 +74,16 @@ fun EditScreen(model: AppModel, vmId: String) {
 	var resizing by remember { mutableStateOf<VmDisk?>(null) }
 	var addingDisk by remember { mutableStateOf(false) }
 	var attaching by remember { mutableStateOf(false) }
+	var leaving by remember { mutableStateOf(false) }
+	val changed =
+		name != vm.name || cpu != vm.cpu || memory != vm.memoryMib.toString() ||
+			cmdline != (vm.boot?.cmdline ?: "") || console != (vm.boot?.consoleDevice ?: "ttyS0") || notes != vm.notes ||
+			user != vm.access.user || password != (vm.access.password ?: "") ||
+			vncPort != vm.access.vncPort.toString() || vncPassword != (vm.access.vncPassword ?: "") ||
+			autoStart != vm.autoStart
 
-	SubScreen(title = "Edit ${vm.name}", model = model) {
+	BackHandler(enabled = changed) { leaving = true }
+	SubScreen(title = "Edit ${vm.name}", model = model, onBack = { if (changed) leaving = true else model.back() }) {
 		if (!stopped) {
 			Text(
 				"Shut the machine down to change its resources and disks.",
@@ -74,29 +94,34 @@ fun EditScreen(model: AppModel, vmId: String) {
 			OutlinedTextField(value = name, onValueChange = {
 				name = it
 			}, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-			SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-				SegmentedButton(selected = cpu == CpuMode.ONE, onClick = {
-					cpu = CpuMode.ONE
-				}, shape = SegmentedButtonDefaults.itemShape(0, 2), enabled = stopped) { Text("One CPU") }
-				SegmentedButton(selected = cpu == CpuMode.MATCH_HOST, onClick = {
-					cpu = CpuMode.MATCH_HOST
-				}, shape = SegmentedButtonDefaults.itemShape(1, 2), enabled = stopped) {
-					Text("One per core")
+			if (!termux) {
+				SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+					SegmentedButton(selected = cpu == CpuMode.ONE, onClick = {
+						cpu = CpuMode.ONE
+					}, shape = SegmentedButtonDefaults.itemShape(0, 2), enabled = stopped) { Text("One CPU") }
+					SegmentedButton(selected = cpu == CpuMode.MATCH_HOST, onClick = {
+						cpu = CpuMode.MATCH_HOST
+					}, shape = SegmentedButtonDefaults.itemShape(1, 2), enabled = stopped) {
+						Text("One per core")
+					}
 				}
+				OutlinedTextField(
+					value = memory,
+					onValueChange = { memory = it.filter(Char::isDigit) },
+					label = { Text("Memory (MB)") },
+					enabled = stopped,
+					singleLine = true,
+					keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+					isError = memoryWarning(memory.toLongOrNull() ?: 0, totalMib) != null,
+					supportingText = {
+						Text(
+							memoryWarning(memory.toLongOrNull() ?: 0, totalMib)
+								?: "This phone has ${memoryLabel(totalMib.toInt() / 1024 * 1024)}.",
+						)
+					},
+					modifier = Modifier.fillMaxWidth(),
+				)
 			}
-			OutlinedTextField(
-				value = memory,
-				onValueChange = { memory = it.filter(Char::isDigit) },
-				label = { Text("Memory (MiB)") },
-				enabled = stopped,
-				singleLine = true,
-				keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-				isError = memoryWarning(memory.toLongOrNull() ?: 0, totalMib) != null,
-				supportingText = {
-					Text(memoryWarning(memory.toLongOrNull() ?: 0, totalMib) ?: "This phone has ${totalMib / 1024} GiB.")
-				},
-				modifier = Modifier.fillMaxWidth(),
-			)
 			Row(verticalAlignment = Alignment.CenterVertically) {
 				Column(Modifier.weight(1f)) {
 					Text("Start when the phone starts")
@@ -105,31 +130,36 @@ fun EditScreen(model: AppModel, vmId: String) {
 				Switch(checked = autoStart, onCheckedChange = { autoStart = it })
 			}
 		}
-		Panel(title = "Disks") {
-			for (disk in vm.disks) {
-				val usage = app.vms.diskFile(vm, disk.file).usage()
-				Column {
-					Text("${disk.label} · ${usage.allocated / Operations.GIB} GiB", style = MaterialTheme.typography.bodyLarge)
-					Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-						if (disk.role != DiskRole.SEED && disk.role != DiskRole.CDROM) {
-							TextButton(enabled = stopped, onClick = { resizing = disk }) { Text("Grow") }
-						}
-						if (vm.boot?.diskId != disk.id && disk.role != DiskRole.SEED) {
-							TextButton(enabled = stopped, onClick = {
-								model.run("Looking for a kernel", { app.operations.setBootDisk(vm, disk) }) {}
-							}) { Text("Boot from this") }
-						}
-						if (vm.boot?.diskId != disk.id) {
-							TextButton(enabled = stopped, onClick = {
-								model.run("Removing ${disk.label}", { app.operations.removeDisk(vm, disk) }) {}
-							}) { Text("Remove") }
+		if (!termux) {
+			Panel(title = "Disks") {
+				for (disk in vm.disks) {
+					val usage = app.vms.diskFile(vm, disk.file).usage()
+					Column {
+						Text(
+							"${disk.label} · ${formatBytes(usage.allocated)}, ${formatBytes(usage.used)} used",
+							style = MaterialTheme.typography.bodyLarge,
+						)
+						Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+							if (disk.role != DiskRole.SEED && disk.role != DiskRole.CDROM) {
+								TextButton(enabled = stopped, onClick = { resizing = disk }) { Text("Grow") }
+							}
+							if (vm.boot?.diskId != disk.id && disk.role != DiskRole.SEED) {
+								TextButton(enabled = stopped, onClick = {
+									model.run("Looking for a kernel", { app.operations.setBootDisk(vm, disk) }) {}
+								}) { Text("Boot from this") }
+							}
+							if (vm.boot?.diskId != disk.id) {
+								TextButton(enabled = stopped, onClick = {
+									model.run("Removing ${disk.label}", { app.operations.removeDisk(vm, disk) }) {}
+								}) { Text("Remove") }
+							}
 						}
 					}
 				}
-			}
-			Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-				FilledTonalButton(enabled = stopped, onClick = { addingDisk = true }) { Text("Add an empty disk") }
-				FilledTonalButton(enabled = stopped, onClick = { attaching = true }) { Text("Attach an image") }
+				Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+					FilledTonalButton(enabled = stopped, onClick = { addingDisk = true }) { Text("Add an empty disk") }
+					FilledTonalButton(enabled = stopped, onClick = { attaching = true }) { Text("Attach an image") }
+				}
 			}
 		}
 		if (vm.boot != null) {
@@ -153,20 +183,18 @@ fun EditScreen(model: AppModel, vmId: String) {
 			OutlinedTextField(value = user, onValueChange = {
 				user = it
 			}, label = { Text("User") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-			OutlinedTextField(value = password, onValueChange = {
-				password = it
-			}, label = { Text("Password") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-			OutlinedTextField(
-				value = vncPort,
-				onValueChange = { vncPort = it.filter(Char::isDigit) },
-				label = { Text("Guest VNC port") },
-				singleLine = true,
-				keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-				modifier = Modifier.fillMaxWidth(),
-			)
-			OutlinedTextField(value = vncPassword, onValueChange = {
-				vncPassword = it
-			}, label = { Text("VNC password") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+			SecretField(password, { password = it }, "Password")
+			if (!termux) {
+				OutlinedTextField(
+					value = vncPort,
+					onValueChange = { vncPort = it.filter(Char::isDigit) },
+					label = { Text("Guest VNC port") },
+					singleLine = true,
+					keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+					modifier = Modifier.fillMaxWidth(),
+				)
+				SecretField(vncPassword, { vncPassword = it }, "VNC password")
+			}
 		}
 		Panel(title = "Notes") {
 			OutlinedTextField(value = notes, onValueChange = { notes = it }, modifier = Modifier.fillMaxWidth(), minLines = 3)
@@ -201,12 +229,12 @@ fun EditScreen(model: AppModel, vmId: String) {
 			text = {
 				Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
 					Text(
-						"It's $current GiB. Disks can only grow. Cloud images grow their filesystem on the next boot; others need growpart and resize2fs inside.",
+						"It's $current GB. Disks can only grow. Cloud images grow their filesystem on the next boot; others need growpart and resize2fs inside.",
 					)
 					OutlinedTextField(
 						value = size,
 						onValueChange = { size = it.filter(Char::isDigit) },
-						label = { Text("New size (GiB)") },
+						label = { Text("New size (GB)") },
 						keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
 					)
 				}
@@ -221,6 +249,20 @@ fun EditScreen(model: AppModel, vmId: String) {
 			dismissButton = { TextButton(onClick = { resizing = null }) { Text("Cancel") } },
 		)
 	}
+	if (leaving) {
+		AlertDialog(
+			onDismissRequest = { leaving = false },
+			title = { Text("Discard your changes?") },
+			text = { Text("Your changes to ${vm.name} aren't saved yet.") },
+			confirmButton = {
+				TextButton(onClick = {
+					leaving = false
+					model.back()
+				}) { Text("Discard") }
+			},
+			dismissButton = { TextButton(onClick = { leaving = false }) { Text("Keep editing") } },
+		)
+	}
 	if (addingDisk) {
 		var size by remember { mutableStateOf("8") }
 		var label by remember { mutableStateOf("Data") }
@@ -233,7 +275,7 @@ fun EditScreen(model: AppModel, vmId: String) {
 					OutlinedTextField(
 						value = size,
 						onValueChange = { size = it.filter(Char::isDigit) },
-						label = { Text("Size (GiB)") },
+						label = { Text("Size (GB)") },
 						keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
 					)
 					Text(
@@ -270,4 +312,27 @@ fun EditScreen(model: AppModel, vmId: String) {
 			confirmButton = { TextButton(onClick = { attaching = false }) { Text("Close") } },
 		)
 	}
+}
+
+/** A password field that hides what's typed until the eye is tapped. */
+@Composable
+private fun SecretField(value: String, onValueChange: (String) -> Unit, label: String) {
+	var shown by remember { mutableStateOf(false) }
+	OutlinedTextField(
+		value = value,
+		onValueChange = onValueChange,
+		label = { Text(label) },
+		singleLine = true,
+		visualTransformation = if (shown) VisualTransformation.None else PasswordVisualTransformation(),
+		keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+		trailingIcon = {
+			IconButton(onClick = { shown = !shown }) {
+				Icon(
+					if (shown) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+					contentDescription = if (shown) "Hide $label" else "Show $label",
+				)
+			}
+		},
+		modifier = Modifier.fillMaxWidth(),
+	)
 }

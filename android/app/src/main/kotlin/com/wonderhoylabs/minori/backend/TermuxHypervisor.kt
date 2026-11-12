@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import com.wonderhoylabs.minori.model.BackendKind
 import com.wonderhoylabs.minori.model.VmConfig
@@ -18,7 +19,9 @@ import java.net.Socket
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.thread
 
 /**
  * A Linux userland Termux's proot-distro can install, and how to put an SSH server in it. [airiLibraries] installs what
@@ -68,6 +71,13 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 		val password = vm.access.password ?: throw IOException("This machine has no password set.")
 		val port = port(vm)
 		val firstRun = !File(dir, SET_UP_MARKER).exists()
+		// Still running from before Minori last stopped, after an update say: start it afresh, or the new proot would
+		// find the port taken, end, and take what it started with it.
+		if (listening(port)) {
+			runCatching { run(stopCommand(vm, port), background = true).get(STOP_TIMEOUT_MS, TimeUnit.MILLISECONDS) }
+			val until = System.currentTimeMillis() + STOP_TIMEOUT_MS
+			while (listening(port) && System.currentTimeMillis() < until) Thread.sleep(POLL_MS)
+		}
 		// Termux answers through a PendingIntent when it refuses a command or the command ends. sshd -D doesn't end,
 		// so any answer before the port opens means something went wrong, and it says what.
 		val desktop = if (TermuxDesktop.isSetUp(vm)) vncPort(vm) to rdpPort(vm) else null
@@ -89,6 +99,20 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 			Thread.sleep(POLL_MS)
 		}
 		File(dir, SET_UP_MARKER).createNewFile()
+		// Nothing tells Minori when Termux's processes go, killed by Android or by hand, so it watches the SSH server.
+		val stopping = AtomicBoolean(false)
+		thread(name = "termux-watch", isDaemon = true) {
+			var misses = 0
+			while (!stopping.get()) {
+				Thread.sleep(WATCH_MS)
+				misses = if (listening(port)) 0 else misses + 1
+				if (misses >= 2 && stopping.compareAndSet(false, true)) {
+					events.onStopped(
+						if (childProcessLimit()) CHILD_PROCESS_REASON else "The machine's SSH server stopped in Termux.",
+					)
+				}
+			}
+		}
 		val shell =
 			Ssh.channel(
 				hostAlias = "termux-${vm.id}",
@@ -122,24 +146,30 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 			}
 
 			override fun forceStop() {
+				stopping.set(true)
 				shell.close()
-				// Airi's agent and the loop that restarts it go with the machine, or they'd go on running in Termux.
-				val airi = airiPort(vm)
-				val stop =
-					"pkill -f 'sshd -D -p $port'; pkill -f 'minori-airi $airi '; " +
-						"pkill -f 'airi-agent serve --port $airi'; " +
-						// The desktop loop notices the SSH server has gone and stops its servers itself.
-						"true"
-				runCatching { run(stop, background = true) }
+				runCatching { run(stopCommand(vm, port), background = true) }
 				events.onStopped(null)
 			}
 		}
+	}
+
+	// Airi's agent and the loop that restarts it go with the machine, or they'd go on running in Termux. The desktop loop
+	// notices the SSH server has gone and stops its servers itself.
+	private fun stopCommand(vm: VmConfig, port: Int): String {
+		val airi = airiPort(vm)
+		return "pkill -f 'sshd -D -p $port'; pkill -f 'minori-airi $airi '; pkill -f 'airi-agent serve --port $airi'; true"
 	}
 
 	private fun listening(port: Int): Boolean = runCatching {
 		Socket().use { it.connect(InetSocketAddress("127.0.0.1", port), 500) }
 		true
 	}.getOrDefault(false)
+
+	private val loopScript: String by lazy {
+		val bytes = context.assets.open(TermuxDesktop.LOOP_ASSET).use { it.readBytes() }
+		android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+	}
 
 	private fun script(
 		distro: TermuxDistro,
@@ -152,17 +182,36 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 		val airi = airiPort?.let { "(test ! -x $AIRI_LOOP || (nohup $AIRI_LOOP $it $port >/dev/null 2>&1 &)) && " }.orEmpty()
 		// So does the desktop, once Minori has added one: see TermuxDesktop.
 		val loop = TermuxDesktop.LOOP
+		// Written afresh every start, so a desktop added by an older Minori gets the loop's fixes.
 		val desktopLoop =
 			desktop
-				?.let { (vnc, rdp) -> "(test ! -x $loop || (nohup $loop $vnc $rdp $port >/dev/null 2>&1 &)) && " }
+				?.let { (vnc, rdp) ->
+					"(test ! -x $loop || (echo $loopScript | base64 -d > $loop.new && chmod 755 $loop.new && " +
+						"mv $loop.new $loop && (nohup $loop $vnc $rdp $port >/dev/null 2>&1 &))) && "
+				}.orEmpty()
+		// The phone's time zone, where the distribution has the zone files for it.
+		val zone =
+			java.util.TimeZone
+				.getDefault()
+				.id
+				.takeIf { com.wonderhoylabs.minori.service.TIME_ZONE.matches(it) }
+				?.let { "(test ! -e /usr/share/zoneinfo/$it || ln -sf /usr/share/zoneinfo/$it /etc/localtime) && " }
 				.orEmpty()
 		val inside =
-			"${distro.installSsh} && mkdir -p /run/sshd && ssh-keygen -A && echo 'root:$password' | chpasswd && " +
+			"${distro.installSsh} && mkdir -p /run/sshd && ssh-keygen -A && echo 'root:$password' | chpasswd && " + zone +
 				airi + desktopLoop +
 				"exec /usr/sbin/sshd -D -p $port -o PermitRootLogin=yes -o PasswordAuthentication=yes -o ListenAddress=127.0.0.1"
 		return "set -e; command -v proot-distro >/dev/null || pkg install -y proot-distro; " +
 			"proot-distro login ${distro.id} -- true 2>/dev/null || (${distro.install}); " +
 			"proot-distro login ${distro.id} -- sh -c \"$inside\""
+	}
+
+	/**
+	 * Has Termux delete [distro]'s installation, with everything in it, for when the last machine using it goes. It
+	 * returns at once; Termux carries on in the background.
+	 */
+	fun removeDistro(distro: TermuxDistro) {
+		runCatching { run("proot-distro remove ${distro.id}", background = true) }
 	}
 
 	/**
@@ -238,6 +287,31 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 		 */
 		fun offersRunCommand(context: Context): Boolean =
 			runCatching { context.packageManager.getPermissionInfo(RUN_COMMAND_PERMISSION, 0) }.isSuccess
+
+		/**
+		 * Whether Android stops an app's child processes once there are more than 32 of them, as it does from Android
+		 * 12 until "Disable child process restrictions" is on in Developer options. Every Termux machine is several of
+		 * Termux's child processes, and a desktop is dozens. Any app may read the flag behind that switch.
+		 */
+		fun childProcessLimit(): Boolean {
+			if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
+			val value =
+				runCatching {
+					val process = ProcessBuilder("/system/bin/getprop", PHANTOM_FLAG).redirectErrorStream(true).start()
+					process.inputStream.bufferedReader().use { it.readText() }.trim().also { process.waitFor() }
+				}.getOrDefault("")
+			return value != "false"
+		}
+
+		/** Explains a Termux machine Android stopped, and what to change. */
+		const val CHILD_PROCESS_REASON =
+			"The machine stopped in Termux. Android stops Termux's processes once there are more than 32, which a few " +
+				"Termux machines or a desktop go past, so turn on Disable child process restrictions in Developer " +
+				"options, then start it again."
+
+		private const val PHANTOM_FLAG = "persist.sys.fflag.override.settings_enable_monitor_phantom_procs"
+		private const val WATCH_MS = 5_000L
+		private const val STOP_TIMEOUT_MS = 10_000L
 		private const val PORT_BASE = 20000
 		private const val AIRI_PORT_BASE = 30000
 		private const val VNC_PORT_BASE = 40000

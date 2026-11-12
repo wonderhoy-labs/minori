@@ -123,24 +123,44 @@ fun SshScreen(model: AppModel, vmId: String) {
 		}
 		val dir = app.vms.dir(vmId)
 		val key = File(dir, "ssh/id_rsa").takeIf { it.exists() }?.readText()
+		// A machine that has only just started has nothing listening yet, neither its guest agent nor sshd, so the
+		// first logins are tried again for a while, saying so, rather than showing that as a failure.
+		val deadline = System.currentTimeMillis() + SSH_WAIT_MS
 		session =
 			withContext(Dispatchers.IO) {
-				runCatching {
-					Ssh.shell(
-						title = vm.name,
-						hostAlias = "vm-$vmId.minori",
-						user = vm.access.user,
-						password = vm.access.password,
-						privateKey = key,
-						knownHosts = File(dir, "ssh/known_hosts"),
-						open = { guest.connect(vm.access.sshPort) },
-						confirmHostKey = { message ->
-							val answer = CompletableDeferred<Boolean>()
-							hostKey = message to answer
-							runBlocking { answer.await() }.also { hostKey = null }
-						},
-					)
-				}.onFailure { status = "Couldn't log in over SSH: ${it.message}" }.getOrNull()
+				while (true) {
+					val attempt =
+						runCatching {
+							Ssh.shell(
+								title = vm.name,
+								hostAlias = "vm-$vmId.minori",
+								user = vm.access.user,
+								password = vm.access.password,
+								privateKey = key,
+								knownHosts = File(dir, "ssh/known_hosts"),
+								open = { guest.connect(vm.access.sshPort) },
+								confirmHostKey = { message ->
+									val answer = CompletableDeferred<Boolean>()
+									hostKey = message to answer
+									runBlocking { answer.await() }.also { hostKey = null }
+								},
+							)
+						}
+					attempt.getOrNull()?.let {
+						status = null
+						return@withContext it
+					}
+					val error = attempt.exceptionOrNull()
+					val notUpYet = error?.message.orEmpty().let { "Session.connect" in it || "listening" in it }
+					if (!notUpYet || System.currentTimeMillis() > deadline || app.machines.guest(vmId) == null) {
+						status = "Couldn't log in over SSH: ${error?.let(::sshProblem)}"
+						return@withContext null
+					}
+					status = "Waiting for ${vm.name}'s SSH server to start…"
+					Thread.sleep(SSH_RETRY_MS)
+				}
+				@Suppress("UNREACHABLE_CODE")
+				null
 			}
 	}
 	DisposableEffect(vmId) { onDispose { session?.close() } }
@@ -157,4 +177,13 @@ fun SshScreen(model: AppModel, vmId: String) {
 			dismissButton = { TextButton(onClick = { answer.complete(false) }) { Text("Cancel") } },
 		)
 	}
+}
+
+private const val SSH_WAIT_MS = 2 * 60 * 1000L
+private const val SSH_RETRY_MS = 2000L
+
+/** What went wrong logging in, without Java's exception names. */
+private fun sshProblem(error: Throwable): String {
+	val message = generateSequence(error) { it.cause }.mapNotNull { it.message }.lastOrNull() ?: "unknown error"
+	return message.removePrefix("Session.connect: ").substringAfter("Exception: ")
 }

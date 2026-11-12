@@ -6,6 +6,7 @@ import android.widget.Toast
 import com.wonderhoylabs.minori.MinoriApp
 import com.wonderhoylabs.minori.R
 import com.wonderhoylabs.minori.service.AiriSetup
+import com.wonderhoylabs.minori.ui.screens.memoryLabel
 
 /**
  * Starts a machine for Airi, when someone opens one of its apps while it's stopped, and closes again at once without
@@ -24,6 +25,13 @@ class AiriStartActivity : Activity() {
 			!AiriSetup.isSetUp(
 				vm,
 			) -> Toast.makeText(this, getString(R.string.app_link_needs_airi, vm.name), Toast.LENGTH_LONG).show()
+
+			memoryShort(this, vm) != null ->
+				Toast.makeText(
+					this,
+					getString(R.string.app_link_low_memory, vm.name, memoryLabel(vm.memoryMib)),
+					Toast.LENGTH_LONG,
+				).show()
 
 			else -> app.machines.start(vm.id)
 		}

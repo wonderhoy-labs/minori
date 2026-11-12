@@ -43,6 +43,7 @@ import com.wonderhoylabs.minori.backend.DemoTarget
 import com.wonderhoylabs.minori.model.BackendKind
 import com.wonderhoylabs.minori.model.CpuMode
 import com.wonderhoylabs.minori.model.VmConfig
+import com.wonderhoylabs.minori.model.VmState
 import com.wonderhoylabs.minori.service.AiriSetup
 import com.wonderhoylabs.minori.service.Catalog
 import com.wonderhoylabs.minori.service.Job
@@ -59,6 +60,7 @@ import com.wonderhoylabs.minori.ui.screens.SshScreen
 import com.wonderhoylabs.minori.ui.screens.StoreItemScreen
 import com.wonderhoylabs.minori.ui.screens.StoreTab
 import com.wonderhoylabs.minori.ui.screens.VncScreen
+import com.wonderhoylabs.minori.ui.screens.memoryLabel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -219,6 +221,12 @@ class MainActivity : ComponentActivity() {
 		}
 		if (!AiriSetup.knowsMachines(this)) {
 			Toast.makeText(this, getString(R.string.app_link_old_airi), Toast.LENGTH_LONG).show()
+			return
+		}
+		// Stays on the machine's page, whose Start says why and offers to start it anyway.
+		val running = app.machines.states.value[vm.id].let { it != null && it != VmState.Stopped && it !is VmState.Failed }
+		if (!running && memoryShort(this, vm) != null) {
+			model.message.value = getString(R.string.app_link_low_memory, vm.name, memoryLabel(vm.memoryMib))
 			return
 		}
 		app.machines.start(vm.id)

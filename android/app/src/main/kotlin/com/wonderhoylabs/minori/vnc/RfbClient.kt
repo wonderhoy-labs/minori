@@ -9,6 +9,7 @@ import java.io.BufferedOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.IOException
+import java.util.concurrent.Executors
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 
@@ -202,26 +203,41 @@ class RfbClient(private val connection: GuestConnection, private val password: S
 		frameCount.value++
 	}
 
-	@Synchronized
-	fun pointer(x: Int, y: Int, buttons: Int) {
+	// Input comes from the UI thread, where Android refuses network writes on a TCP socket, as a Termux machine's
+	// desktop is. One thread sends it all, in order.
+	private val sender = Executors.newSingleThreadExecutor { Thread(it, "vnc-input").apply { isDaemon = true } }
+
+	private fun send(write: DataOutputStream.() -> Unit) {
 		runCatching {
-			output.writeByte(5)
-			output.writeByte(buttons)
-			output.writeShort(x.coerceIn(0, width - 1))
-			output.writeShort(y.coerceIn(0, height - 1))
-			output.flush()
+			sender.execute {
+				runCatching {
+					synchronized(this@RfbClient) {
+						output.write()
+						output.flush()
+					}
+				}
+			}
 		}
 	}
 
-	@Synchronized
-	fun key(keysym: Int, down: Boolean) {
-		runCatching {
-			output.writeByte(4)
-			output.writeByte(if (down) 1 else 0)
-			output.writeShort(0)
-			output.writeInt(keysym)
-			output.flush()
+	/** Moves the pointer to [x], [y] with [buttons] held, a bit each from the left button. */
+	fun pointer(x: Int, y: Int, buttons: Int) {
+		val px = x.coerceIn(0, width - 1)
+		val py = y.coerceIn(0, height - 1)
+		send {
+			writeByte(5)
+			writeByte(buttons)
+			writeShort(px)
+			writeShort(py)
 		}
+	}
+
+	/** Presses or releases the key [keysym]. */
+	fun key(keysym: Int, down: Boolean) = send {
+		writeByte(4)
+		writeByte(if (down) 1 else 0)
+		writeShort(0)
+		writeInt(keysym)
 	}
 
 	fun type(text: String) {
@@ -237,7 +253,10 @@ class RfbClient(private val connection: GuestConnection, private val password: S
 		}
 	}
 
-	fun close() = connection.close()
+	fun close() {
+		sender.shutdown()
+		connection.close()
+	}
 
 	companion object {
 		const val KEY_RETURN = 0xff0d

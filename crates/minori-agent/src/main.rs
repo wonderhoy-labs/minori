@@ -84,7 +84,7 @@ fn serve_tcp(address: &str, token: Option<String>) -> io::Result<()> {
 }
 
 /// Answers a connection only once its first line is `TOKEN <token>`.
-fn handle_with_token<R: Read + Send + 'static, W: Write + Send + 'static>(
+fn handle_with_token<R: Read + Send + 'static, W: Write + HalfClose + Send + 'static>(
 	reader: R,
 	mut writer: W,
 	token: &str,
@@ -153,11 +153,11 @@ fn serve_vsock() -> io::Result<()> {
 }
 
 /// Answers one connection from the phone.
-fn handle<R: Read + Send + 'static, W: Write + Send + 'static>(reader: R, writer: W) -> io::Result<()> {
+fn handle<R: Read + Send + 'static, W: Write + HalfClose + Send + 'static>(reader: R, writer: W) -> io::Result<()> {
 	handle_buffered(BufReader::new(reader), writer)
 }
 
-fn handle_buffered<R: Read + Send + 'static, W: Write + Send + 'static>(
+fn handle_buffered<R: Read + Send + 'static, W: Write + HalfClose + Send + 'static>(
 	mut reader: BufReader<R>,
 	mut writer: W,
 ) -> io::Result<()> {
@@ -224,8 +224,30 @@ fn handle_buffered<R: Read + Send + 'static, W: Write + Send + 'static>(
 	}
 }
 
+/// Ends one direction of a connection, keeping the other open: shutdown(SHUT_WR).
+trait HalfClose {
+	fn half_close(&self);
+}
+
+impl HalfClose for TcpStream {
+	fn half_close(&self) {
+		let _ = self.shutdown(Shutdown::Write);
+	}
+}
+
+#[cfg(unix)]
+impl HalfClose for std::fs::File {
+	fn half_close(&self) {
+		use std::os::fd::AsRawFd;
+		// SAFETY: shutdown on a descriptor this File owns; it changes no memory.
+		unsafe {
+			libc::shutdown(self.as_raw_fd(), libc::SHUT_WR);
+		}
+	}
+}
+
 /// Copies bytes both ways until both directions have closed.
-fn splice<R: Read + Send + 'static, W: Write + Send + 'static>(
+fn splice<R: Read + Send + 'static, W: Write + HalfClose + Send + 'static>(
 	mut from_phone: BufReader<R>,
 	mut to_phone: W,
 	service: TcpStream,
@@ -238,6 +260,10 @@ fn splice<R: Read + Send + 'static, W: Write + Send + 'static>(
 	});
 	let _ = io::copy(&mut from_service, &mut to_phone);
 	let _ = from_service.shutdown(Shutdown::Read);
+	// The service has finished, so say so to the phone, which waits for it. The phone may not be able to do the same
+	// the other way (Android won't let an app shut down a vsock), so this is how most connections end.
+	let _ = to_phone.flush();
+	to_phone.half_close();
 	let _ = upstream.join();
 	Ok(())
 }
@@ -388,6 +414,30 @@ mod tests {
 		let mut reply = String::new();
 		BufReader::new(phone).read_line(&mut reply).unwrap();
 		reply
+	}
+
+	#[test]
+	fn tells_the_phone_when_the_service_closes_first() {
+		let service = TcpListener::bind("127.0.0.1:0").unwrap();
+		let port = service.local_addr().unwrap().port();
+		thread::spawn(move || {
+			let (mut stream, _) = service.accept().unwrap();
+			stream.write_all(b"bye").unwrap();
+		});
+		let agent = TcpListener::bind("127.0.0.1:0").unwrap();
+		let agent_address = agent.local_addr().unwrap();
+		thread::spawn(move || {
+			let (stream, _) = agent.accept().unwrap();
+			let reader = stream.try_clone().unwrap();
+			handle(reader, stream).unwrap();
+		});
+		let mut phone = TcpStream::connect(agent_address).unwrap();
+		phone.set_read_timeout(Some(std::time::Duration::from_secs(5))).unwrap();
+		writeln!(phone, "CONNECT {port}").unwrap();
+		// The phone keeps its own side open, as Android makes it, and still hears that the service has gone.
+		let mut all = Vec::new();
+		phone.read_to_end(&mut all).unwrap();
+		assert_eq!(all, b"OK\nbye");
 	}
 
 	#[test]

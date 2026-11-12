@@ -91,6 +91,7 @@ fun CreateScreen(model: AppModel, screen: Screen.Create) {
 	val template = Catalog.template(screen.templateId)
 	val image = screen.imageId?.let { app.images.get(it) }
 	val termux = screen.termux
+	val haveImage = remember(template) { template != null && Catalog.downloaded(template.baseImage, app.images) != null }
 	if (template == null && image == null && !termux) return
 	val totalMib = remember { totalMemoryMib(context) }
 	val cores = Runtime.getRuntime().availableProcessors()
@@ -128,7 +129,7 @@ fun CreateScreen(model: AppModel, screen: Screen.Create) {
 		}
 
 	SubScreen(title = "New machine", model = model) {
-		SourceHeader(template, image, termux)
+		SourceHeader(template, image, termux, haveImage)
 		Panel(title = "Name") {
 			OutlinedTextField(
 				value = name,
@@ -337,12 +338,23 @@ fun CreateScreen(model: AppModel, screen: Screen.Create) {
 			},
 			enabled = name.isNotBlank(),
 			modifier = Modifier.fillMaxWidth(),
-		) { Text(if (template != null) "Download and create" else "Create", modifier = Modifier.padding(vertical = 6.dp)) }
+		) {
+			Text(
+				if (template != null &&
+					!haveImage
+				) {
+					"Download and create"
+				} else {
+					"Create"
+				},
+				modifier = Modifier.padding(vertical = 6.dp),
+			)
+		}
 	}
 }
 
 @Composable
-private fun SourceHeader(template: Template?, image: ImageRecord?, termux: Boolean) {
+private fun SourceHeader(template: Template?, image: ImageRecord?, termux: Boolean, haveImage: Boolean) {
 	Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
 		when {
 			template != null -> StoreIconTile(template.icon, size = 64.dp)
@@ -357,9 +369,16 @@ private fun SourceHeader(template: Template?, image: ImageRecord?, termux: Boole
 			)
 			Text(
 				when {
-					template != null -> "${downloadLabel(template)} to download · first boot ${template.firstBoot}"
+					template != null && haveImage && template.extraDownloadMb == 0 ->
+						"Its image is already on this phone · first boot ${template.firstBoot}"
+
+					template != null ->
+						"${downloadLabel(template, haveImage)} to download · first boot ${template.firstBoot}"
+
 					image != null -> verdictText(image)
+
 					termux -> "A proot userland in Termux. It shares the phone's kernel."
+
 					else -> ""
 				},
 				style = MaterialTheme.typography.bodyMedium,
