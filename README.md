@@ -120,7 +120,8 @@ the page shows each port's state and how many connections it served or refused.
   notes to change.
 - **Export** writes a `.minorivm` archive anywhere the system's file picker can save; **Import a .minorivm archive** on
   the main screen brings one back. The format is in [docs/archive.md](docs/archive.md).
-- **Clone** copies a machine, disks and all. **Delete** asks whether to keep its disks in Images.
+- **Clone** copies a machine, disks and all. **Delete** asks whether to keep its disks in Images. Deleting the last
+  Termux machine of a distribution offers to remove that distribution from Termux too.
 
 ### Without a hypervisor: Termux
 
@@ -273,6 +274,7 @@ debug build's demo backend pointed at real guests: Debian 13 in QEMU, and Debian
 | **Firefox from the store**: made from the downloaded image in seconds, first boot in about 3 minutes, Firefox in Minori's viewer loading example.com | Same | Pass after a fix: the viewer's taps and keys never reached a Termux machine's desktop, since they were written on the main thread |
 | RDP app with Microsoft's Windows App on the Firefox machine | Same | The app opened on 127.0.0.1 and showed the machine's certificate; not signed in, since accepting the certificate was left to the owner |
 | GNOME (4 GB) and Firefox (3 GB) running at once | Same | Android swapped until Minori stopped responding. Since 0.7.0 Minori asks before starting a machine that needs more memory than is free |
+| Deleting Termux machines with **Remove … from Termux**: Termux ran `proot-distro remove` for Ubuntu, Alpine, Fedora and Arch | Pixel 10 Pro | Pass |
 | Android's terminal through Minori, 0.7.0 | Same | Default route `minori0`, `curl https://deb.debian.org/debian/` HTTP/2 200 |
 | The helper as Asahi uses it: hello, list, ports, a stream to the Firefox machine's SSH, its desktop | Pixel 10 Pro, `tools/minori-client.ts` on the Mac | Pass. Asahi itself wasn't run again: its setup would have replaced the phone's VPN |
 | Minori noticing a Termux machine whose SSH server was killed; Edit for a Termux machine; the notifications prompt on the first start; Discard on Edit's back | Emulator (`Minori_Test_API_37`), F-Droid Termux 0.118.3 | Pass |

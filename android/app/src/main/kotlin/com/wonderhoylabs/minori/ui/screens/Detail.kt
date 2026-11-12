@@ -290,22 +290,44 @@ fun DetailScreen(model: AppModel, vmId: String) {
 	}
 	if (confirmDelete) {
 		var keepDisks by remember { mutableStateOf(false) }
+		// A Termux machine lives in its distribution's installation in Termux, which other machines may share.
+		val distro =
+			TermuxHypervisor.DISTROS.firstOrNull { it.id == vm.distro }?.takeIf { distro ->
+				vm.backend == BackendKind.TERMUX &&
+					app.vms.vms.value.none { it.id != vm.id && it.backend == BackendKind.TERMUX && it.distro == distro.id }
+			}
+		var removeDistro by remember { mutableStateOf(true) }
 		ConfirmDialog(
 			title = "Delete ${vm.name}?",
 			text =
-				if (keepDisks) {
-					"Its settings go, and its disks move to Images."
-				} else {
-					"Its settings and disks are deleted. This can't be undone."
+				when {
+					keepDisks -> "Its settings go, and its disks move to Images."
+
+					distro != null && removeDistro ->
+						"Its settings go, and Termux deletes its ${distro.name}, with everything in it. This can't be undone."
+
+					distro != null -> "Its settings go. Its ${distro.name} stays in Termux, for proot-distro or a new machine."
+
+					else -> "Its settings and disks are deleted. This can't be undone."
 				},
 			confirm = "Delete",
 			onConfirm = {
 				app.machines.forceStop(vm.id)
 				app.vms.delete(vm.id, keepDisks, app.images)
+				if (distro != null && removeDistro) TermuxHypervisor(context).removeDistro(distro)
 				model.back()
 			},
 			onDismiss = { confirmDelete = false },
 			extra = {
+				if (distro != null) {
+					Row(
+						verticalAlignment = Alignment.CenterVertically,
+						modifier = Modifier.toggleable(removeDistro, role = Role.Checkbox) { removeDistro = it },
+					) {
+						Checkbox(checked = removeDistro, onCheckedChange = null)
+						Text("  Remove ${distro.name} from Termux")
+					}
+				}
 				if (vm.backend != BackendKind.TERMUX) {
 					Row(
 						verticalAlignment = Alignment.CenterVertically,

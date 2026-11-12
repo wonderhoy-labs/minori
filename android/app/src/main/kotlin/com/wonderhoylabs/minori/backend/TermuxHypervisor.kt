@@ -207,6 +207,14 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 	}
 
 	/**
+	 * Has Termux delete [distro]'s installation, with everything in it, for when the last machine using it goes. It
+	 * returns at once; Termux carries on in the background.
+	 */
+	fun removeDistro(distro: TermuxDistro) {
+		runCatching { run("proot-distro remove ${distro.id}", background = true) }
+	}
+
+	/**
 	 * Checks that Termux will run Minori's commands at all, by running `true`. Returns null when it does, or what
 	 * the user has to do.
 	 */
