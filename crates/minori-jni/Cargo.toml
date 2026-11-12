@@ -16,7 +16,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 bytes = "1"
-jni = { version = "0.21", default-features = false }
+jni = { version = "0.22", default-features = false }
 libc = "0.2"
 minori-core = { path = "../minori-core" }
 serde = { version = "1", features = ["derive"] }
