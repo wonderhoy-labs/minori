@@ -23,11 +23,14 @@ object TermuxDesktop {
 	/** Where Minori puts the loop that keeps the desktop running. */
 	const val LOOP = "/root/.local/bin/minori-desktop"
 
-	/** The distributions Minori knows how to put Xfce, TigerVNC and xrdp on. */
+	/**
+	 * The distributions Minori knows how to put Xfce, TigerVNC and xrdp on, with the package holding the wallpaper
+	 * their Xfce looks for, without which the desktop is black.
+	 */
 	private val PACKAGES =
 		mapOf(
-			"debian" to APT,
-			"ubuntu" to APT,
+			"debian" to "$APT desktop-base",
+			"ubuntu" to "$APT xubuntu-wallpapers",
 		)
 
 	private const val APT =

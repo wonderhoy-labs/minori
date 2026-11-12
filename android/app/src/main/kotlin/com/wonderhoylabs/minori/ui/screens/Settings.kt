@@ -52,6 +52,7 @@ import com.wonderhoylabs.minori.setup.Privileges
 import com.wonderhoylabs.minori.store.freeBytes
 import com.wonderhoylabs.minori.ui.AppModel
 import com.wonderhoylabs.minori.ui.Brand
+import com.wonderhoylabs.minori.ui.ChildProcessNotice
 import com.wonderhoylabs.minori.ui.InfoRow
 import com.wonderhoylabs.minori.ui.Panel
 import com.wonderhoylabs.minori.ui.Screen
@@ -120,6 +121,7 @@ fun SettingsTab(model: AppModel) {
 			} else if (termux == Availability.Ready) {
 				OutlinedButton(onClick = { checkTermux(model, app) }) { Text("Check Termux") }
 			}
+			if (termux == Availability.Ready) ChildProcessNotice("a few Termux machines, or one with a desktop,")
 		}
 		TerminalPanel(model)
 		Panel(title = "Notifications") {

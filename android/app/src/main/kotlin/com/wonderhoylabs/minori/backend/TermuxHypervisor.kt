@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import com.wonderhoylabs.minori.model.BackendKind
 import com.wonderhoylabs.minori.model.VmConfig
@@ -18,7 +19,9 @@ import java.net.Socket
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.thread
 
 /**
  * A Linux userland Termux's proot-distro can install, and how to put an SSH server in it. [airiLibraries] installs what
@@ -89,6 +92,20 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 			Thread.sleep(POLL_MS)
 		}
 		File(dir, SET_UP_MARKER).createNewFile()
+		// Nothing tells Minori when Termux's processes go, killed by Android or by hand, so it watches the SSH server.
+		val stopping = AtomicBoolean(false)
+		thread(name = "termux-watch", isDaemon = true) {
+			var misses = 0
+			while (!stopping.get()) {
+				Thread.sleep(WATCH_MS)
+				misses = if (listening(port)) 0 else misses + 1
+				if (misses >= 2 && stopping.compareAndSet(false, true)) {
+					events.onStopped(
+						if (childProcessLimit()) CHILD_PROCESS_REASON else "The machine's SSH server stopped in Termux.",
+					)
+				}
+			}
+		}
 		val shell =
 			Ssh.channel(
 				hostAlias = "termux-${vm.id}",
@@ -122,6 +139,7 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 			}
 
 			override fun forceStop() {
+				stopping.set(true)
 				shell.close()
 				// Airi's agent and the loop that restarts it go with the machine, or they'd go on running in Termux.
 				val airi = airiPort(vm)
@@ -238,6 +256,29 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 		 */
 		fun offersRunCommand(context: Context): Boolean =
 			runCatching { context.packageManager.getPermissionInfo(RUN_COMMAND_PERMISSION, 0) }.isSuccess
+
+		/**
+		 * Whether Android stops an app's child processes once there are more than 32 of them, as it does from Android
+		 * 12 until "Disable child process restrictions" is on in Developer options. Every Termux machine is several of
+		 * Termux's child processes, and a desktop is dozens. Any app may read the flag behind that switch.
+		 */
+		fun childProcessLimit(): Boolean {
+			if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
+			val value =
+				runCatching {
+					val process = ProcessBuilder("/system/bin/getprop", PHANTOM_FLAG).redirectErrorStream(true).start()
+					process.inputStream.bufferedReader().use { it.readText() }.trim().also { process.waitFor() }
+				}.getOrDefault("")
+			return value != "false"
+		}
+
+		/** Explains a Termux machine Android stopped, and what to change. */
+		const val CHILD_PROCESS_REASON =
+			"Android stopped Termux's processes, because together they went past its limit for one app. Turn on " +
+				"Disable child process restrictions in Developer options, then start the machine again."
+
+		private const val PHANTOM_FLAG = "persist.sys.fflag.override.settings_enable_monitor_phantom_procs"
+		private const val WATCH_MS = 5_000L
 		private const val PORT_BASE = 20000
 		private const val AIRI_PORT_BASE = 30000
 		private const val VNC_PORT_BASE = 40000

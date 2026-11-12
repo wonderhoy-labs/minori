@@ -90,6 +90,7 @@ import com.wonderhoylabs.minori.service.gib
 import com.wonderhoylabs.minori.store.usage
 import com.wonderhoylabs.minori.ui.ActionTile
 import com.wonderhoylabs.minori.ui.AppModel
+import com.wonderhoylabs.minori.ui.ChildProcessNotice
 import com.wonderhoylabs.minori.ui.ConfirmDialog
 import com.wonderhoylabs.minori.ui.InfoRow
 import com.wonderhoylabs.minori.ui.MachineTile
@@ -703,6 +704,7 @@ private fun TermuxDesktopPanel(model: AppModel, vm: VmConfig, running: Boolean) 
 			style = MaterialTheme.typography.bodySmall,
 			color = MaterialTheme.colorScheme.onSurfaceVariant,
 		)
+		ChildProcessNotice("a desktop")
 		FilledTonalButton(enabled = running, onClick = {
 			model.run("Adding a desktop to ${vm.name}", { job -> TermuxDesktop.install(context, app.vms, vm, job) }) {
 				model.message.value = "${vm.name} has a desktop now. Open it with Desktop."
