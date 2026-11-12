@@ -294,7 +294,7 @@ fun DetailScreen(model: AppModel, vmId: String) {
 		val distro =
 			TermuxHypervisor.DISTROS.firstOrNull { it.id == vm.distro }?.takeIf { distro ->
 				vm.backend == BackendKind.TERMUX &&
-					app.vms.vms.value.none { it.id != vm.id && it.backend == BackendKind.TERMUX && it.distro == distro.id }
+					vms.none { it.id != vm.id && it.backend == BackendKind.TERMUX && it.distro == distro.id }
 			}
 		var removeDistro by remember { mutableStateOf(true) }
 		ConfirmDialog(
