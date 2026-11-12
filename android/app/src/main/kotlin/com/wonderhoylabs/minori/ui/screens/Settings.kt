@@ -75,9 +75,7 @@ fun SettingsTab(model: AppModel) {
 	val termuxInstalled =
 		remember(refresh) { runCatching { context.packageManager.getPackageInfo(TermuxHypervisor.TERMUX, 0) }.isSuccess }
 	val termuxOffersCommands = remember(refresh) { TermuxHypervisor.offersRunCommand(context) }
-	val notificationsAllowed =
-		Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-			context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+	val notificationsAllowed = remember(refresh) { com.wonderhoylabs.minori.ui.notificationsAllowed(context) }
 
 	Column(
 		Modifier.fillMaxSize().verticalScroll(

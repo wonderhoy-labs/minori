@@ -309,13 +309,14 @@ fun SubScreen(
 	model: AppModel,
 	actions: @Composable RowScope.() -> Unit = {},
 	scroll: Boolean = true,
+	onBack: () -> Unit = { model.back() },
 	content: @Composable ColumnScope.() -> Unit,
 ) {
 	Column(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
 		TopAppBar(
 			title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
 			navigationIcon = {
-				IconButton(onClick = { model.back() }) {
+				IconButton(onClick = onBack) {
 					Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
 				}
 			},

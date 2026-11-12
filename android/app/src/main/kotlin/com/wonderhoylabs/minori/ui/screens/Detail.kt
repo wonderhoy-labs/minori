@@ -99,6 +99,7 @@ import com.wonderhoylabs.minori.ui.StatusPill
 import com.wonderhoylabs.minori.ui.SubScreen
 import com.wonderhoylabs.minori.ui.backendLabel
 import com.wonderhoylabs.minori.ui.copy
+import com.wonderhoylabs.minori.ui.rememberStartAsking
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -174,7 +175,8 @@ fun DetailScreen(model: AppModel, vmId: String) {
 			}
 		}
 	}) {
-		Hero(vm, state, onStart = { app.machines.start(vm.id) }, onStop = { app.machines.stop(vm.id) }, onForce = {
+		val start = rememberStartAsking { app.machines.start(it) }
+		Hero(vm, state, onStart = { start(vm.id) }, onStop = { app.machines.stop(vm.id) }, onForce = {
 			confirmForce =
 				true
 		})

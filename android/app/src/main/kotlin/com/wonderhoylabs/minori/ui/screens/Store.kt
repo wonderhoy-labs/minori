@@ -48,6 +48,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -88,8 +89,9 @@ private fun Template.matches(query: String): Boolean {
 		features.any { q in it.lowercase() }
 }
 
-fun downloadLabel(template: Template): String {
-	val mb = template.baseImage.sizeMb + template.extraDownloadMb
+/** Roughly how much making [template] downloads, leaving out its base image when that's already on the phone. */
+fun downloadLabel(template: Template, haveImage: Boolean = false): String {
+	val mb = (if (haveImage) 0 else template.baseImage.sizeMb) + template.extraDownloadMb
 	return if (mb >= 1000) "%.1f GB".format(mb / 1000.0) else "$mb MB"
 }
 
@@ -369,6 +371,8 @@ fun verdictText(image: ImageRecord): String {
 fun StoreItemScreen(model: AppModel, templateId: String) {
 	val template = Catalog.template(templateId) ?: return
 	val scheme = MaterialTheme.colorScheme
+	val app = MinoriApp.get(LocalContext.current)
+	val haveImage = remember(template) { Catalog.downloaded(template.baseImage, app.images) != null }
 	SubScreen(title = "", model = model) {
 		Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)) {
 			StoreIconTile(template.icon, size = 96.dp)
@@ -421,7 +425,15 @@ fun StoreItemScreen(model: AppModel, templateId: String) {
 		Panel(title = "Needs") {
 			InfoRow(Icons.Rounded.Memory, "Memory", "${memoryLabel(template.memoryMib)} suggested")
 			InfoRow(Icons.Rounded.Storage, "Storage", "${template.diskGib} GB disk, which only takes what it uses")
-			InfoRow(Icons.Rounded.CloudDownload, "Download", downloadLabel(template))
+			InfoRow(
+				Icons.Rounded.CloudDownload,
+				"Download",
+				if (haveImage && template.extraDownloadMb == 0) {
+					"Nothing, its image is already on this phone"
+				} else {
+					downloadLabel(template, haveImage) + if (haveImage) ", its image is already on this phone" else ""
+				},
+			)
 			InfoRow(Icons.Rounded.Schedule, "First boot", template.firstBoot.replaceFirstChar { it.uppercase() })
 		}
 		Panel(title = "Source") {

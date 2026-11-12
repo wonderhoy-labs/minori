@@ -462,10 +462,12 @@ object Catalog {
 	 * Downloads a base image into the library, resuming a partial download, and checks it against the project's
 	 * checksum list before keeping it. Reuses an earlier download that passed.
 	 */
+	// The downloaded copy of base on this phone, if there is one.
+	fun downloaded(base: BaseImage, images: ImageStore): ImageRecord? =
+		images.images.value.firstOrNull { it.id == base.id && images.file(it).exists() }
+
 	fun fetch(base: BaseImage, images: ImageStore, job: Job): ImageRecord {
-		images.images.value
-			.firstOrNull { it.id == base.id && images.file(it).exists() }
-			?.let { return it }
+		downloaded(base, images)?.let { return it }
 		val dir = images.newFolder(base.id)
 		val target = File(dir, base.file)
 		val partial = File(dir, "${base.file}.part")
