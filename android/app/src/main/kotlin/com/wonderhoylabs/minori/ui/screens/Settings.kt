@@ -165,10 +165,6 @@ fun SettingsTab(model: AppModel) {
 					)
 				}
 			}
-			Text(
-				"A Wonderhoy Labs project, named for ${Brand.CHARACTER} of ${Brand.UNIT}",
-				style = MaterialTheme.typography.bodyMedium,
-			)
 			OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(Brand.REPOSITORY))) }) {
 				Icon(Icons.Rounded.Code, contentDescription = null, modifier = Modifier.size(18.dp))
 				Text("  Source code")

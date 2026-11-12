@@ -274,8 +274,9 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 
 		/** Explains a Termux machine Android stopped, and what to change. */
 		const val CHILD_PROCESS_REASON =
-			"Android stopped Termux's processes, because together they went past its limit for one app. Turn on " +
-				"Disable child process restrictions in Developer options, then start the machine again."
+			"The machine stopped in Termux. Android stops Termux's processes once there are more than 32, which a few " +
+				"Termux machines or a desktop go past, so turn on Disable child process restrictions in Developer " +
+				"options, then start it again."
 
 		private const val PHANTOM_FLAG = "persist.sys.fflag.override.settings_enable_monitor_phantom_procs"
 		private const val WATCH_MS = 5_000L
