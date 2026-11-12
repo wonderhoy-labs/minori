@@ -36,7 +36,7 @@ object TermuxDesktop {
 
 	private const val APT =
 		"apt-get update -q && DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends " +
-			"xfce4 xfce4-terminal dbus-x11 tigervnc-standalone-server tigervnc-tools xrdp ssl-cert"
+			"xfce4 xfce4-terminal dbus-x11 tigervnc-standalone-server tigervnc-tools xrdp ssl-cert tzdata"
 
 	/** Whether Minori can add a desktop to [vm]. */
 	fun canSetUp(vm: VmConfig): Boolean = vm.backend == BackendKind.TERMUX && vm.distro in PACKAGES

@@ -189,8 +189,16 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 					"(test ! -x $loop || (echo $loopScript | base64 -d > $loop.new && chmod 755 $loop.new && " +
 						"mv $loop.new $loop && (nohup $loop $vnc $rdp $port >/dev/null 2>&1 &))) && "
 				}.orEmpty()
+		// The phone's time zone, where the distribution has the zone files for it.
+		val zone =
+			java.util.TimeZone
+				.getDefault()
+				.id
+				.takeIf { com.wonderhoylabs.minori.service.TIME_ZONE.matches(it) }
+				?.let { "(test ! -e /usr/share/zoneinfo/$it || ln -sf /usr/share/zoneinfo/$it /etc/localtime) && " }
+				.orEmpty()
 		val inside =
-			"${distro.installSsh} && mkdir -p /run/sshd && ssh-keygen -A && echo 'root:$password' | chpasswd && " +
+			"${distro.installSsh} && mkdir -p /run/sshd && ssh-keygen -A && echo 'root:$password' | chpasswd && " + zone +
 				airi + desktopLoop +
 				"exec /usr/sbin/sshd -D -p $port -o PermitRootLogin=yes -o PasswordAuthentication=yes -o ListenAddress=127.0.0.1"
 		return "set -e; command -v proot-distro >/dev/null || pkg install -y proot-distro; " +

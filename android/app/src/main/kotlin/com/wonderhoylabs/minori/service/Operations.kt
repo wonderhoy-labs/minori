@@ -488,12 +488,12 @@ class Operations(private val context: Context, private val vms: VmStore, private
 	}
 }
 
-/** A size for people: GiB from 1 GiB, MiB from 1 MiB, KiB below that. */
+/** A size for people, in GB, MB or KB of 1024, the way Android's own settings count them. */
 fun Long.gib(): String = when {
-	this >= Operations.GIB -> "%.1f GiB".format(this.toDouble() / Operations.GIB)
-	this >= 1024 * 1024 -> "%d MiB".format(this / (1024 * 1024))
-	else -> "%d KiB".format(this / 1024)
+	this >= Operations.GIB -> "%.1f GB".format(this.toDouble() / Operations.GIB)
+	this >= 1024 * 1024 -> "%d MB".format(this / (1024 * 1024))
+	else -> "%d KB".format(this / 1024)
 }
 
 /** A time zone name such as America/New_York, which is safe to put in a shell command. */
-private val TIME_ZONE = Regex("[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*")
+internal val TIME_ZONE = Regex("[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*")
