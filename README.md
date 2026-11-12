@@ -269,6 +269,12 @@ debug build's demo backend pointed at real guests: Debian 13 in QEMU, and Debian
 | Fedora 45 | Same | No kernel found: it's only in the Btrfs root. The store stays on Fedora 43 |
 | **Termux**: Ubuntu, Alpine, Fedora and Arch Linux ARM machines started at once, each online, consoles through the helper | Pixel 10 Pro, F-Droid Termux 0.118.3 | Pass |
 | A desktop in the Ubuntu 26.04 Termux machine: install (about 4 minutes), Xfce in Minori's viewer, FreeRDP to the same session | Same | Pass after fixes: the backdrop was black, and with four Termux machines running, Android's limit of 32 child processes killed the desktop and three SSH servers |
+| Airi in the GNOME machine: Set up in Minori (8 s), GNOME's apps listed, Text Editor in an Airi window with typing; `minori://vm/GNOME/app/org.gnome.TextEditor.desktop` starting the stopped machine and opening it (about 40 s) | Pixel 10 Pro, Airi 0.4.1 | Pass |
+| **Firefox from the store**: made from the downloaded image in seconds, first boot in about 3 minutes, Firefox in Minori's viewer loading example.com | Same | Pass after a fix: the viewer's taps and keys never reached a Termux machine's desktop, since they were written on the main thread |
+| RDP app with Microsoft's Windows App on the Firefox machine | Same | The app opened on 127.0.0.1 and showed the machine's certificate; not signed in, since accepting the certificate was left to the owner |
+| GNOME (4 GB) and Firefox (3 GB) running at once | Same | Android swapped until Minori stopped responding. Since 0.7.0 Minori asks before starting a machine that needs more memory than is free |
+| Android's terminal through Minori, 0.7.0 | Same | Default route `minori0`, `curl https://deb.debian.org/debian/` HTTP/2 200 |
+| The helper as Asahi uses it: hello, list, ports, a stream to the Firefox machine's SSH, its desktop | Pixel 10 Pro, `tools/minori-client.ts` on the Mac | Pass. Asahi itself wasn't run again: its setup would have replaced the phone's VPN |
 | Minori noticing a Termux machine whose SSH server was killed; Edit for a Termux machine; the notifications prompt on the first start; Discard on Edit's back | Emulator (`Minori_Test_API_37`), F-Droid Termux 0.118.3 | Pass |
 | **Arch Linux ARM in Termux**, 0.6.2: download, signature check, install, pacman keyring and openssh, console (`Arch Linux ARM`, `aarch64`); first setup in the background without Display over other apps | Emulator (`Airi_Test_API_37`, arm64), F-Droid Termux 0.118.3 | Pass |
 
@@ -277,8 +283,9 @@ debug build's demo backend pointed at real guests: Debian 13 in QEMU, and Debian
 - The Xfce machine through Shira with Wi-Fi off: Shira's page went away before that run.
 - IPv6 through the terminal's link: the agent only routes IPv4, and the terminal had no IPv6 route to leak through.
 
-- The app items (Firefox, LibreOffice and the rest) on a phone.
-- RDP and SSH from apps on the phone itself; only FreeRDP on the Mac through the same forwarded port.
+- The app items other than Firefox on a phone.
+- Signing in with RDP and SSH apps on the phone itself; FreeRDP on the Mac signed in through the same forwarded port.
+- A Termux desktop with Android's child process limit turned off. With it on, Android kills the desktop.
 - Auto-start at boot, which needs the phone restarted.
 - Refusing a non-adb app on the helper socket. Minori checks the peer's uid, but no other app tried.
 
@@ -379,6 +386,7 @@ the guest the size by themselves.
 - AVF only offers one virtual CPU or one per core.
 - Resizing the terminal doesn't reflow lines already printed.
 - The VNC viewer only speaks raw and copy-rect updates, fine over Minori's own connection but heavy over a network.
+- Keys sent far faster than anyone types, such as `adb shell input text`, can arrive scrambled in the VNC viewer.
 
 ## Development
 
