@@ -179,7 +179,9 @@ fun StoreTab(model: AppModel) {
 			item { Featured(Catalog.templates.first()) { model.go(Screen.StoreItem(it.id)) } }
 		}
 		items(templates.drop(if (shelf == Shelf.All && query.isBlank()) 1 else 0), key = { it.id }) { template ->
-			StoreRow(template) { model.go(Screen.StoreItem(template.id)) }
+			StoreRow(template, Catalog.downloaded(template.baseImage, app.images) != null) {
+				model.go(Screen.StoreItem(template.id))
+			}
 		}
 		if (showTermux) {
 			item {
@@ -238,7 +240,7 @@ private fun Featured(template: Template, onOpen: (Template) -> Unit) {
 	) {
 		Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
 			Text(
-				"FEATURED",
+				"Featured",
 				style = MaterialTheme.typography.labelMedium,
 				color = scheme.onPrimaryContainer,
 				fontWeight = FontWeight.Bold,
@@ -262,11 +264,11 @@ private fun Featured(template: Template, onOpen: (Template) -> Unit) {
 }
 
 @Composable
-private fun StoreRow(template: Template, onOpen: () -> Unit) {
+private fun StoreRow(template: Template, haveImage: Boolean, onOpen: () -> Unit) {
 	ListCard(
 		tile = { StoreIconTile(template.icon) },
 		title = template.name,
-		subtitle = "${template.category.label.removeSuffix("s")} · ${downloadLabel(template)}",
+		subtitle = "${template.category.label.removeSuffix("s")} · ${downloadLabel(template, haveImage)}",
 		text = template.summary,
 		button = "Get",
 		onClick = onOpen,
@@ -380,7 +382,7 @@ fun StoreItemScreen(model: AppModel, templateId: String) {
 				Text(template.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
 				Text(template.publisher, style = MaterialTheme.typography.bodyMedium, color = scheme.primary)
 				Text(
-					"${template.category.label.removeSuffix("s")} · ${downloadLabel(template)}",
+					"${template.category.label.removeSuffix("s")} · ${downloadLabel(template, haveImage)}",
 					style = MaterialTheme.typography.labelMedium,
 					color = scheme.onSurfaceVariant,
 				)
