@@ -300,6 +300,15 @@ class Operations(private val context: Context, private val vms: VmStore, private
 			run += "apt-get update"
 			run += "DEBIAN_FRONTEND=noninteractive apt-get install -y ${firstBoot.packages.joinToString(" ")}"
 		}
+		// The phone's time zone, so the guest's clock and its desktop's read like the phone's rather than UTC.
+		java.util.TimeZone
+			.getDefault()
+			.id
+			.takeIf { TIME_ZONE.matches(it) }
+			?.let { zone ->
+				run +=
+					"timedatectl set-timezone $zone 2>/dev/null || ln -sf /usr/share/zoneinfo/$zone /etc/localtime"
+			}
 		run += firstBoot.extraRun
 		run += "touch /var/lib/minori-ready"
 		return buildJsonObject {
@@ -485,3 +494,6 @@ fun Long.gib(): String = when {
 	this >= 1024 * 1024 -> "%d MiB".format(this / (1024 * 1024))
 	else -> "%d KiB".format(this / 1024)
 }
+
+/** A time zone name such as America/New_York, which is safe to put in a shell command. */
+private val TIME_ZONE = Regex("[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*")
