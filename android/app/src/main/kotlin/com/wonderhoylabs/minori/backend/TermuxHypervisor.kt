@@ -71,6 +71,13 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 		val password = vm.access.password ?: throw IOException("This machine has no password set.")
 		val port = port(vm)
 		val firstRun = !File(dir, SET_UP_MARKER).exists()
+		// Still running from before Minori last stopped, after an update say: start it afresh, or the new proot would
+		// find the port taken, end, and take what it started with it.
+		if (listening(port)) {
+			runCatching { run(stopCommand(vm, port), background = true).get(STOP_TIMEOUT_MS, TimeUnit.MILLISECONDS) }
+			val until = System.currentTimeMillis() + STOP_TIMEOUT_MS
+			while (listening(port) && System.currentTimeMillis() < until) Thread.sleep(POLL_MS)
+		}
 		// Termux answers through a PendingIntent when it refuses a command or the command ends. sshd -D doesn't end,
 		// so any answer before the port opens means something went wrong, and it says what.
 		val desktop = if (TermuxDesktop.isSetUp(vm)) vncPort(vm) to rdpPort(vm) else null
@@ -141,23 +148,28 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 			override fun forceStop() {
 				stopping.set(true)
 				shell.close()
-				// Airi's agent and the loop that restarts it go with the machine, or they'd go on running in Termux.
-				val airi = airiPort(vm)
-				val stop =
-					"pkill -f 'sshd -D -p $port'; pkill -f 'minori-airi $airi '; " +
-						"pkill -f 'airi-agent serve --port $airi'; " +
-						// The desktop loop notices the SSH server has gone and stops its servers itself.
-						"true"
-				runCatching { run(stop, background = true) }
+				runCatching { run(stopCommand(vm, port), background = true) }
 				events.onStopped(null)
 			}
 		}
+	}
+
+	// Airi's agent and the loop that restarts it go with the machine, or they'd go on running in Termux. The desktop loop
+	// notices the SSH server has gone and stops its servers itself.
+	private fun stopCommand(vm: VmConfig, port: Int): String {
+		val airi = airiPort(vm)
+		return "pkill -f 'sshd -D -p $port'; pkill -f 'minori-airi $airi '; pkill -f 'airi-agent serve --port $airi'; true"
 	}
 
 	private fun listening(port: Int): Boolean = runCatching {
 		Socket().use { it.connect(InetSocketAddress("127.0.0.1", port), 500) }
 		true
 	}.getOrDefault(false)
+
+	private val loopScript: String by lazy {
+		val bytes = context.assets.open(TermuxDesktop.LOOP_ASSET).use { it.readBytes() }
+		android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+	}
 
 	private fun script(
 		distro: TermuxDistro,
@@ -170,10 +182,13 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 		val airi = airiPort?.let { "(test ! -x $AIRI_LOOP || (nohup $AIRI_LOOP $it $port >/dev/null 2>&1 &)) && " }.orEmpty()
 		// So does the desktop, once Minori has added one: see TermuxDesktop.
 		val loop = TermuxDesktop.LOOP
+		// Written afresh every start, so a desktop added by an older Minori gets the loop's fixes.
 		val desktopLoop =
 			desktop
-				?.let { (vnc, rdp) -> "(test ! -x $loop || (nohup $loop $vnc $rdp $port >/dev/null 2>&1 &)) && " }
-				.orEmpty()
+				?.let { (vnc, rdp) ->
+					"(test ! -x $loop || (echo $loopScript | base64 -d > $loop.new && chmod 755 $loop.new && " +
+						"mv $loop.new $loop && (nohup $loop $vnc $rdp $port >/dev/null 2>&1 &))) && "
+				}.orEmpty()
 		val inside =
 			"${distro.installSsh} && mkdir -p /run/sshd && ssh-keygen -A && echo 'root:$password' | chpasswd && " +
 				airi + desktopLoop +
@@ -280,6 +295,7 @@ class TermuxHypervisor(private val context: Context) : Hypervisor {
 
 		private const val PHANTOM_FLAG = "persist.sys.fflag.override.settings_enable_monitor_phantom_procs"
 		private const val WATCH_MS = 5_000L
+		private const val STOP_TIMEOUT_MS = 10_000L
 		private const val PORT_BASE = 20000
 		private const val AIRI_PORT_BASE = 30000
 		private const val VNC_PORT_BASE = 40000

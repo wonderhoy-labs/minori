@@ -17,7 +17,8 @@ import java.io.IOException
  * phone's loopback.
  */
 object TermuxDesktop {
-	private const val LOOP_ASSET = "minori-desktop.sh"
+	/** The loop in Minori's assets. */
+	const val LOOP_ASSET = "minori-desktop.sh"
 	private const val DIR = "/root/.config/minori-desktop"
 
 	/** Where Minori puts the loop that keeps the desktop running. */
