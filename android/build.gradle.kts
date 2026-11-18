@@ -4,7 +4,7 @@ plugins {
 	// This has to match the Kotlin version built into the Android plugin.
 	id("org.jetbrains.kotlin.plugin.compose") version "2.4.21" apply false
 	id("org.jetbrains.kotlin.plugin.serialization") version "2.4.21" apply false
-	id("com.diffplug.spotless") version "8.10.4"
+	id("com.diffplug.spotless") version "8.11.0"
 }
 
 // Formatting shared by every Wonderhoy Labs app: tabs shown 4 wide, from the .editorconfig at the top of the
