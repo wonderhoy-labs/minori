@@ -134,7 +134,7 @@ dependencies {
 	implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
 	implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
 	implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
-	implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+	implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
 	implementation("dev.rikka.shizuku:api:13.1.5")
 	implementation("dev.rikka.shizuku:provider:13.1.5")
 	implementation("org.lsposed.hiddenapibypass:hiddenapibypass:6.2")
